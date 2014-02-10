@@ -8,9 +8,7 @@ rng = np.random
 
 visibleSize = 28*28 # number of input units 
 hiddenSize = 196    # number of hidden units 
-sparsityParam = 0.1 # desired average activation of the hidden units.
-Lambda = 100        # weight decay parameter       
-beta = 3            # weight of sparsity penalty term       
+alpha = 100         # learning rate
 
 # Load the dataset
 import cPickle, gzip
@@ -65,8 +63,8 @@ gw1, gb1, gw2, gb2 = T.grad(cost, [cW1, cb1, cW2, cb2])
 train = theano.function(
           inputs=[index],
           outputs=[cost],
-          updates=((cW1, cW1 - Lambda * gw1), (cb1, cb1 - Lambda * gb1),
-                   (cW2, cW2 - Lambda * gw2), (cb2, cb2 - Lambda * gb2)),
+          updates=((cW1, cW1 - alpha * gw1), (cb1, cb1 - alpha * gb1),
+                   (cW2, cW2 - alpha * gw2), (cb2, cb2 - alpha * gb2)),
           givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]})
 predict = theano.function(inputs=[x], outputs=[a1,a2,cost])
 
