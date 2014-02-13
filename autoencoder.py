@@ -9,6 +9,7 @@ rng = np.random
 visibleSize = 28*28 # number of input units 
 hiddenSize = 196    # number of hidden units 
 alpha = 100         # learning rate
+ds = 10             # downscaling factor
 
 # Load the dataset
 import cPickle, gzip
@@ -39,16 +40,26 @@ x = T.matrix('x')   # Training data
 r  = np.sqrt(6) / np.sqrt(hiddenSize+visibleSize+1)
 
 # DCT Coefficients matrices for weights and biases
-cW1 = theano.shared(rng.randn(visibleSize, hiddenSize) * 2 * r - r, name='C1')
-cW2 = theano.shared(rng.randn(hiddenSize, visibleSize) * 2 * r - r, name='C2')
-cb1 = theano.shared(np.zeros(hiddenSize))
-cb2 = theano.shared(np.zeros(visibleSize))
+cW1 = theano.shared(rng.randn(visibleSize/ds, hiddenSize/ds) * 2 * r - r, name='C1')
+cW2 = theano.shared(rng.randn(hiddenSize/ds, visibleSize/ds) * 2 * r - r, name='C2')
+cb1 = theano.shared(np.zeros(hiddenSize/ds))
+cb2 = theano.shared(np.zeros(visibleSize/ds))
+
+# Expand the coefficients into larger matrices
+W1 = T.zeros((visibleSize, hiddenSize))
+W1 = dct.idct2(T.set_subtensor(W1[:visibleSize/ds,:hiddenSize/ds], cW1))
+W2 = T.zeros((hiddenSize, visibleSize))
+W2 = dct.idct2(T.set_subtensor(W2[:hiddenSize/ds,:visibleSize/ds], cW2))
+b1 = T.zeros([hiddenSize])
+b1 = dct.idct(T.set_subtensor(b1[:hiddenSize/ds], cb1))
+b2 = T.zeros([visibleSize])
+b2 = dct.idct(T.set_subtensor(b2[:visibleSize/ds], cb2))
 
 # Use the inverse DCT transform to recover the weights/biases of the network
-W1 = dct.idct2(cW1)
-W2 = dct.idct2(cW2)
-b1 = dct.idct(cb1)
-b2 = dct.idct(cb2)
+# W1 = dct.idct2(cW1)
+# W2 = dct.idct2(cW2)
+# b1 = dct.idct(cb1)
+# b2 = dct.idct(cb2)
 
 # Forward Propagate
 a1 = T.nnet.sigmoid(T.dot(x, W1) + b1)
@@ -66,6 +77,8 @@ train = theano.function(
           updates=((cW1, cW1 - alpha * gw1), (cb1, cb1 - alpha * gb1),
                    (cW2, cW2 - alpha * gw2), (cb2, cb2 - alpha * gb2)),
           givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]})
+# theano.printing.pydotprint(train,'graph.png')
+
 predict = theano.function(inputs=[x], outputs=[a1,a2,cost])
 
 start = time.time()
