@@ -2,79 +2,65 @@ import numpy as np
 import theano
 import theano.tensor as T
 import matplotlib.pyplot as plt
+import numpy.linalg
 rng = np.random
 
-x = T.vector('x')
-a = T.matrix('a')
-N = T.iscalar('N')
+def dct_matrix(rows, cols, unitary=True):
+    """
+    Return a (rows x cols) matrix implementing a discrete cosine transform.
 
-# DCT - 1-dimensional dct transform. 
-# Should be applied to a vector x.
-# Returns a vector of dct coefficients with the same dimension as x.
-def dct(x):
-    N = x.shape[0]
-    a = T.ones([N,1]) * T.arange(N)
-    X = T.dot(T.cos((a + .5) * (np.pi/N * a.T)), x)
-    return X
+    This algorithm is adapted from Dan Ellis' Rastmat
+    spec2cep.m, lines 15 - 20.
+    """
+    rval = np.zeros((rows, cols))
+    col_range = np.arange(cols)
+    scale = np.sqrt(2.0/cols)
+    for i in xrange(rows):
+        rval[i] = np.cos(i * (col_range*2+1)/(2.0 * cols) * np.pi) * scale
 
-# iDCT - Inverse 1-dimensional dct. 
-# Should be applied to a vector of dct coefficients.
-# Returns a vector of the same dimension containing the reconstructed elements.
-def idct(x):
-    b = T.matrix('b')
-    N = x.shape[0]
-    a = T.ones([N,1]) * T.arange(N)
-    b = T.cos((a.T + .5) * (np.pi/N * a))
-    c = T.set_subtensor(b[:,0], .5)
-    X = T.dot(c, x) * (2./N)
-    return X
-
-# dct2 - 2-dimensional dct transform
-# Should be applied to a matrix x.
-# Returns a matrix of dct coefficients with the same dimension as x.
-def dct2(x):
-    ''' Apply 1D dct to the rows & columns of x '''
-    result, updates = theano.scan(dct,sequences=[x])
-    result2, updates2 = theano.scan(dct, sequences=[result.T])
-    return result2.T
-
-# idct2 - Inverse 2-dimensional dct.
-# Should be applied to a matrix of dct coefficients x.
-# Returns a matrix of the same dimension containing the reconstructed elements.
-def idct2(x):
-    ''' Apply 1D idct to the rows & columns of x '''
-    result, updates = theano.scan(idct,sequences=[x])
-    result2, updates2 = theano.scan(idct, sequences=[result.T])
-    return result2.T
-
-r = T.iscalar('r')
-c = T.iscalar('c')
+    if unitary:
+        rval[0] *= np.sqrt(0.5)
+    return rval
 
 
-def idct2Expand(x, r, c):
-    ''' Apply 1D idct to the rows & columns of x '''
-    result, updates = theano.scan(idctExpand,sequences=[x],non_sequences=[r])
-    result2, updates2 = theano.scan(idctExpand, sequences=[result.T],non_sequences=[c])
-    return result2.T
+class dct:
+    """
+    DCT class is capable of doing 1 and 2 dimensional dct transforms.
+    Inputs: currShape: Tuple containing the shape of the input
+            targetShape: Tuple containing the shape of the resized input (optional)
+    Returns: 1/2 dimensional dct & idct transforms
+    """
 
-def idctExpand(x, N):
-    b = T.matrix('b')
-    a = T.ones([N,1]) * T.arange(N)
-    b = T.cos((a.T + .5) * (np.pi/N * a))
-    c = T.set_subtensor(b[:,0], .5)
-    z = T.zeros([N],dtype='float32')
-    X = T.dot(c, T.set_subtensor(z[:x.size], x)) * (2./N)
-    return X
+    def __init__(self, currShape, targetShape=None):
+        """
+        Pre-generate the matrices used to do the dct transform
+        """
+        self.transforms = []
+        self.inverses = []
 
-# X = idct2Expand(x,r,c)
-# dc = theano.function(inputs=[x,r,c], outputs=X, allow_input_downcast=True, on_unused_input='ignore')
-# v = np.ones((2,2))
-# print v
-# print dc(v,5,5)
-# X = idctExpand(x,N)
-# dc = theano.function(inputs=[x,N], outputs=X, allow_input_downcast=True, on_unused_input='ignore')
-# v = rng.randn(5)
-# print v
-# print dc(v,20)
+        for i in range(len(currShape)):
+            if not targetShape:
+                t = dct_matrix(currShape[i],currShape[i])
+                t_inv = numpy.linalg.inv(t)
+            else:
+                t = dct_matrix(targetShape[i], targetShape[i])
+                t_inv = numpy.linalg.inv(t)
+                # Reshape these 
+                t = t[:,:currShape[i]]
+                t_inv = t_inv[:,:currShape[i]]
+            
+            self.transforms.append(t)
+            self.inverses.append(t_inv)
 
-    
+    def dct(self, x):
+        return T.dot(self.transforms[0], x)
+
+    def dct2(self, x):
+        return T.dot(self.transforms[1], T.dot(self.transforms[0], x).T).T
+
+    def idct(self, x):
+        return T.dot(self.inverses[0], x)
+
+    def idct2(self, x):
+        return T.dot(self.inverses[1], T.dot(self.inverses[0], x).T).T
+

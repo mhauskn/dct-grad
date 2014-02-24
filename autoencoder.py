@@ -27,7 +27,6 @@ test_set_x, test_set_y = shared_dataset(test_set)
 valid_set_x, valid_set_y = shared_dataset(valid_set)
 train_set_x, train_set_y = shared_dataset(train_set)
 
-
 m = test_set[0].shape[0] # Number training samples
 batch_size = m
 n_train_batches = m / batch_size
@@ -45,21 +44,16 @@ cW2 = theano.shared(rng.randn(hiddenSize/ds, visibleSize/ds) * 2 * r - r, name='
 cb1 = theano.shared(np.zeros(hiddenSize/ds))
 cb2 = theano.shared(np.zeros(visibleSize/ds))
 
-# Expand the coefficients into larger matrices
-W1 = T.zeros((visibleSize, hiddenSize))
-W1 = dct.idct2(T.set_subtensor(W1[:visibleSize/ds,:hiddenSize/ds], cW1))
-W2 = T.zeros((hiddenSize, visibleSize))
-W2 = dct.idct2(T.set_subtensor(W2[:hiddenSize/ds,:visibleSize/ds], cW2))
-b1 = T.zeros([hiddenSize])
-b1 = dct.idct(T.set_subtensor(b1[:hiddenSize/ds], cb1))
-b2 = T.zeros([visibleSize])
-b2 = dct.idct(T.set_subtensor(b2[:visibleSize/ds], cb2))
+dct_cW1 = dct.dct((visibleSize/ds, hiddenSize/ds), (visibleSize, hiddenSize))
+dct_cW2 = dct.dct((hiddenSize/ds, visibleSize/ds), (hiddenSize, visibleSize))
+dct_cb1 = dct.dct((hiddenSize/ds,), (hiddenSize,))
+dct_cb2 = dct.dct((visibleSize/ds,), (visibleSize,))
 
-# Use the inverse DCT transform to recover the weights/biases of the network
-# W1 = dct.idct2(cW1)
-# W2 = dct.idct2(cW2)
-# b1 = dct.idct(cb1)
-# b2 = dct.idct(cb2)
+# Expand the coefficients into larger matrices
+W1 = dct_cW1.idct2(cW1)
+W2 = dct_cW2.idct2(cW2)
+b1 = dct_cb1.idct(cb1)
+b2 = dct_cb2.idct(cb2)
 
 # Forward Propagate
 a1 = T.nnet.sigmoid(T.dot(x, W1) + b1)
