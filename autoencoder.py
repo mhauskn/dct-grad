@@ -8,8 +8,11 @@ rng = np.random
 
 visibleSize = 28*28 # number of input units 
 hiddenSize = 196    # number of hidden units 
-alpha = 100         # learning rate
-ds = 10             # downscaling factor
+alpha = 1e-3         # learning rate
+useDCT = True
+ds = 1              # downscaling factor
+if useDCT: ds = 10
+    
 
 # Load the dataset
 import cPickle, gzip
@@ -35,26 +38,44 @@ training_epochs = 5
 index = T.lscalar() # Index into the batch of training examples
 x = T.matrix('x')   # Training data
 
-# Initialize weights
+# Initialize weights & biases
 r  = np.sqrt(6) / np.sqrt(hiddenSize+visibleSize+1)
-
-# DCT Coefficients matrices for weights and biases
 cW1 = theano.shared(rng.randn(visibleSize/ds, hiddenSize/ds) * 2 * r - r, name='C1')
 cW2 = theano.shared(rng.randn(hiddenSize/ds, visibleSize/ds) * 2 * r - r, name='C2')
 cb1 = theano.shared(np.zeros(hiddenSize/ds))
 cb2 = theano.shared(np.zeros(visibleSize/ds))
 
-dct_cW1 = dct.dct((visibleSize/ds, hiddenSize/ds), (visibleSize, hiddenSize))
-dct_cW2 = dct.dct((hiddenSize/ds, visibleSize/ds), (hiddenSize, visibleSize))
-dct_cb1 = dct.dct((hiddenSize/ds,), (hiddenSize,))
-dct_cb2 = dct.dct((visibleSize/ds,), (visibleSize,))
+if useDCT:
+    # Find coefficients that expand to the correct initial weight matrices
+    dctShrink_cW1 = dct.dct((visibleSize, hiddenSize))
+    cW1 = theano.shared(dctShrink_cW1.dct2(rng.randn(visibleSize, hiddenSize) * 2 * r - r)\
+                            [:visibleSize/ds,:hiddenSize/ds])
+    dctShrink_cW2 = dct.dct((hiddenSize, visibleSize))
+    cW2 = theano.shared(dctShrink_cW2.dct2(rng.randn(hiddenSize, visibleSize) * 2 * r - r)\
+                            [:hiddenSize/ds,:visibleSize/ds])
+    dctShrink_cb1 = dct.dct((hiddenSize,))
+    cb1 = theano.shared(dctShrink_cb1.dct(np.zeros(hiddenSize))[:hiddenSize/ds])
+    dctShrink_cb2 = dct.dct((visibleSize,))
+    cb2 = theano.shared(dctShrink_cb2.dct(np.zeros(visibleSize))[:visibleSize/ds])
 
-# Expand the coefficients into larger matrices
-W1 = dct_cW1.idct2(cW1)
-W2 = dct_cW2.idct2(cW2)
-b1 = dct_cb1.idct(cb1)
-b2 = dct_cb2.idct(cb2)
+    # Create the DCT objects: currShape, targetShape
+    dct_cW1 = dct.dct(cW1.shape.eval(), (visibleSize, hiddenSize))
+    dct_cW2 = dct.dct(cW2.shape.eval(), (hiddenSize, visibleSize))
+    dct_cb1 = dct.dct(cb1.shape.eval(), (hiddenSize,))
+    dct_cb2 = dct.dct(cb2.shape.eval(), (visibleSize,))
 
+    # Expand the coefficients into larger matrices
+    W1 = dct_cW1.idct2(cW1)
+    W2 = dct_cW2.idct2(cW2)
+    b1 = dct_cb1.idct(cb1)
+    b2 = dct_cb2.idct(cb2)
+
+else:
+    W1 = cW1
+    W2 = cW2
+    b1 = cb1
+    b2 = cb2
+    
 # Forward Propagate
 a1 = T.nnet.sigmoid(T.dot(x, W1) + b1)
 a2 = T.nnet.sigmoid(T.dot(a1, W2) + b2)

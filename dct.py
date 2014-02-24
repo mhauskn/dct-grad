@@ -39,7 +39,7 @@ class dct:
         self.inverses = []
 
         for i in range(len(currShape)):
-            if not targetShape:
+            if targetShape is None:
                 t = dct_matrix(currShape[i],currShape[i])
                 t_inv = numpy.linalg.inv(t)
             else:
@@ -53,14 +53,13 @@ class dct:
             self.inverses.append(t_inv)
 
     def dct(self, x):
-        return T.dot(self.transforms[0], x)
+        return np.dot(self.transforms[0], x)
 
     def dct2(self, x):
-        return T.dot(self.transforms[1], T.dot(self.transforms[0], x).T).T
+        return np.dot(self.transforms[1], np.dot(self.transforms[0], x).T).T
 
     def idct(self, x):
         return T.dot(self.inverses[0], x)
 
     def idct2(self, x):
         return T.dot(self.inverses[1], T.dot(self.inverses[0], x).T).T
-
