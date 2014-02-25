@@ -4,12 +4,20 @@ import theano
 import theano.tensor as T
 import matplotlib.pyplot as plt
 import dct
+
+from utils import tile_raster_images
+import PIL.Image
+
 rng = np.random
 
 visibleSize = 28*28 # number of input units 
 hiddenSize = 196    # number of hidden units 
-alpha = 1e-3         # learning rate
-useDCT = True
+alpha = 1e-1        # learning rate
+Lambda = 3e-3       # weight decay term
+beta = 3            # weight of sparsity penalty term       
+spar = 0.1          # sparsity parameter
+
+useDCT = False      # Enable dct compression
 ds = 1              # downscaling factor
 if useDCT: ds = 10
     
@@ -33,7 +41,6 @@ train_set_x, train_set_y = shared_dataset(train_set)
 m = test_set[0].shape[0] # Number training samples
 batch_size = m
 n_train_batches = m / batch_size
-training_epochs = 5
 
 index = T.lscalar() # Index into the batch of training examples
 x = T.matrix('x')   # Training data
@@ -80,8 +87,11 @@ else:
 a1 = T.nnet.sigmoid(T.dot(x, W1) + b1)
 a2 = T.nnet.sigmoid(T.dot(a1, W2) + b2)
 
-# Cost is the reconstruction error only
-cost = T.sum((a2 - x) ** 2) / (2 * m)
+sse = T.sum((a2 - x) ** 2) / (2 * m)
+avgAct = a1.mean(axis=1)
+KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))
+weightDecayPenalty = (Lambda/2.) * T.sum(cW1 ** 2) + T.sum(cW2 ** 2)
+cost = sse + KL_Div + weightDecayPenalty
 
 # Gradient of cost wrt dct coefficients
 gw1, gb1, gw2, gb2 = T.grad(cost, [cW1, cb1, cW2, cb2]) 
@@ -94,8 +104,15 @@ train = theano.function(
           givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]})
 # theano.printing.pydotprint(train,'graph.png')
 
-predict = theano.function(inputs=[x], outputs=[a1,a2,cost])
+# predict = theano.function(inputs=[x], outputs=[a1,a2,cost])
 
+image = PIL.Image.fromarray(tile_raster_images(
+             X=cW1.eval().T,
+             img_shape=(28, 28), tile_shape=(14, 14),
+             tile_spacing=(1, 1)))
+image.save('untrained.png')
+
+training_epochs = 25
 start = time.time()
 for epoch in xrange(training_epochs):
     for batch_index in xrange(n_train_batches):
@@ -103,4 +120,14 @@ for epoch in xrange(training_epochs):
 end = time.time()
 print 'Elapsed Time (seconds): ', end - start
 
+image = PIL.Image.fromarray(tile_raster_images(
+             X=cW1.eval().T,
+             img_shape=(28, 28), tile_shape=(14, 14),
+             tile_spacing=(1, 1)))
+image.save('trained.png')
+image = PIL.Image.fromarray(tile_raster_images(
+             X=np.dot(cW1.eval(),cW2.eval()).T,
+             img_shape=(28, 28), tile_shape=(28, 28),
+             tile_spacing=(1, 1)))
+image.save('filter2.png')
 
