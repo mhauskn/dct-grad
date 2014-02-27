@@ -7,6 +7,7 @@ import dct
 import mnist
 from utils import tile_raster_images
 import PIL.Image
+import scipy.optimize
 
 rng = np.random
 
@@ -16,13 +17,13 @@ alpha         = 9e-1  # learning rate
 Lambda        = 3e-3  # weight decay term
 beta          = 3     # weight of sparsity penalty term       
 spar          = 0.1   # sparsity parameter
-useDCT        = True  # enable dct compression
-ds            = 1     # downscaling factor
-if useDCT: ds = 10
+useDCT        = False # enable dct compression
+ds            = 1.    # downscaling factor
+if useDCT: ds = 10.
 
 # Load the dataset
 images, labels = mnist.read(range(10))
-images = images / 255 # Remap between [0,1]
+images = images / 255. # Remap between [0,1]
 patches = images[:10000] # Matlab patches use an odd col-major order
 for i in range(len(patches)):
     patches[i,:] = patches[i,:].reshape(28,28).T.flatten()
@@ -51,11 +52,21 @@ index = T.lscalar() # Index into the batch of training examples
 x = T.matrix('x')   # Training data 
 
 # Initialize weights & biases
-r   = np.sqrt(6) / np.sqrt(hiddenSize+visibleSize+1)
-cW1 = theano.shared(rng.randn(visibleSize/ds, hiddenSize/ds) * 2 * r - r, name='C1')
-cW2 = theano.shared(rng.randn(hiddenSize/ds, visibleSize/ds) * 2 * r - r, name='C2')
-cb1 = theano.shared(np.zeros(hiddenSize/ds))
-cb2 = theano.shared(np.zeros(visibleSize/ds))
+v = int(visibleSize/ds) # Effective visual size
+h = int(hiddenSize/ds)  # Effective hidden size
+r   = np.sqrt(6) / np.sqrt(v+h+1)
+
+# TODO: Biases should be initialized to zeros
+theta = theano.shared(value=np.zeros(2*v*h+v+h,dtype=theano.config.floatX),name='theta',borrow=True)
+cW1 = theta[:v*h].reshape((v,h))
+cW2 = theta[v*h:2*v*h].reshape((h,v))
+cb1 = theta[2*v*h:2*v*h+h]
+cb2 = theta[2*v*h+h:]
+
+# cW1 = theano.shared(rng.randn(visibleSize/ds, hiddenSize/ds) * 2 * r - r, name='C1', borrow=True)
+# cW2 = theano.shared(rng.randn(hiddenSize/ds, visibleSize/ds) * 2 * r - r, name='C2', borrow=True)
+# cb1 = theano.shared(np.zeros(hiddenSize/ds), borrow=True)
+# cb2 = theano.shared(np.zeros(visibleSize/ds), borrow=True)
 
 # Load saved matlab weights
 # import scipy.io
@@ -109,29 +120,78 @@ weightDecayPenalty = (Lambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
 cost = sse + KL_Div + weightDecayPenalty
 
 # Gradient of cost wrt dct coefficients
-gw1, gb1, gw2, gb2 = T.grad(cost, [cW1, cb1, cW2, cb2]) 
+grad = T.grad(cost, theta)
+# gw1, gb1, gw2, gb2 = T.grad(cost, [cW1, cb1, cW2, cb2]) 
 
-train = theano.function(
+# Compute the cost of a minibatch
+batch_cost = theano.function(
     inputs=[index],
-    outputs=[cost],
-    updates=((cW1, cW1 - alpha * gw1), (cb1, cb1 - alpha * gb1),
-             (cW2, cW2 - alpha * gw2), (cb2, cb2 - alpha * gb2)),
-    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]})
-# theano.printing.pydotprint(train,'graph.png')
+    outputs=cost,
+    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]},
+    name="batch_cost")
 
+# Compute the gradient of a minibatch WRT theta
+batch_grad = theano.function(
+    inputs=[index],
+    outputs=T.grad(cost, theta),
+    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]},
+    name="batch_grad")
+
+def trainFn(theta_value):
+    theta.set_value(theta_value, borrow=True)
+    train_losses = [batch_cost(i * batch_size) for i in xrange(n_train_batches)]
+    meanLoss = np.mean(train_losses)
+    print meanLoss
+    return meanLoss
+
+def gradFn(theta_value):
+    theta.set_value(theta_value, borrow=True)
+    grad = batch_grad(0)
+    for i in xrange(1, n_train_batches):
+        grad += batch_grad(i * batch_size)
+    return grad / n_train_batches
+
+def callbackFn(theta_value):
+    theta.set_value(theta_value, borrow=True)
+    # train_losses = [batch_cost(i * batch_size) for i in xrange(n_train_batches)]
+    # cW1 = theta[:v*h].reshape((v,h))
+    image = PIL.Image.fromarray(tile_raster_images(
+            X=cW1.eval().T,
+            img_shape=(28, 28), tile_shape=(14, 14),
+            tile_spacing=(1, 1)))
+    image.save('images/epoch_%d.png'%callbackFn.epoch)
+    # print 'Epoch',callbackFn.epoch,np.mean(train_losses)
+    callbackFn.epoch += 1
+callbackFn.epoch = 0
+
+# train = theano.function(
+#     inputs=[index],
+#     outputs=[cost],
+#     updates=(
+#         #(theta, theta - alpha * grad),),
+#         (cW1, cW1 - alpha * gw1), (cb1, cb1 - alpha * gb1),
+#              (cW2, cW2 - alpha * gw2), (cb2, cb2 - alpha * gb2)),
+#     givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]})
 # predict = theano.function(inputs=[x], outputs=[cost], allow_input_downcast=True)
 # print predict(patches)
 
-training_epochs = 1000
+training_epochs = 500
 start = time.time()
-for epoch in xrange(training_epochs):
-    for batch_index in xrange(n_train_batches):
-        print 'Epoch', epoch, train(batch_index)[0]
-        image = PIL.Image.fromarray(tile_raster_images(
-                X=dct_cW1.idct2(cW1).eval().T,
-                img_shape=(28, 28), tile_shape=(14, 14),
-                tile_spacing=(1, 1)))
-        image.save('images/epoch_%d.png'%epoch)
+opttheta = scipy.optimize.fmin_cg(
+    f=trainFn,
+    x0=np.concatenate(((rng.randn(2*v*h)*2*r-r).flatten(),np.zeros(v+h))).astype('float32'),
+    fprime=gradFn,
+    callback=callbackFn,
+    maxiter=training_epochs)
+
+# for epoch in xrange(training_epochs):
+#     for batch_index in xrange(n_train_batches):
+#         print 'Epoch', epoch, train(batch_index)[0]
+#         image = PIL.Image.fromarray(tile_raster_images(
+#                 X=cW1.eval().T,
+#                 img_shape=(28, 28), tile_shape=(14, 14),
+#                 tile_spacing=(1, 1)))
+#         image.save('images/epoch_%d.png'%epoch)
 end = time.time()
 print 'Elapsed Time(s): ', end - start
 
