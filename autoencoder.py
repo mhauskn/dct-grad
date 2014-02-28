@@ -17,7 +17,7 @@ alpha         = 9e-1  # learning rate
 Lambda        = 3e-3  # weight decay term
 beta          = 3     # weight of sparsity penalty term       
 spar          = 0.1   # sparsity parameter
-useDCT        = False # enable dct compression
+useDCT        = True  # enable dct compression
 ds            = 1.    # downscaling factor
 if useDCT: ds = 10.
 
@@ -54,7 +54,7 @@ x = T.matrix('x')   # Training data
 # Initialize weights & biases
 v = int(visibleSize/ds) # Effective visual size
 h = int(hiddenSize/ds)  # Effective hidden size
-r   = np.sqrt(6) / np.sqrt(v+h+1)
+r = np.sqrt(6) / np.sqrt(visibleSize+hiddenSize+1)
 
 # TODO: Biases should be initialized to zeros
 theta = theano.shared(value=np.zeros(2*v*h+v+h,dtype=theano.config.floatX),name='theta',borrow=True)
@@ -78,16 +78,16 @@ cb2 = theta[2*v*h+h:]
 
 if useDCT:
     # Find coefficients that expand to the correct initial weight matrices
-    dctShrink_cW1 = dct.dct((visibleSize, hiddenSize))
-    cW1 = theano.shared(dctShrink_cW1.dct2(rng.randn(visibleSize, hiddenSize) * 2 * r - r)\
-                            [:visibleSize/ds,:hiddenSize/ds])
-    dctShrink_cW2 = dct.dct((hiddenSize, visibleSize))
-    cW2 = theano.shared(dctShrink_cW2.dct2(rng.randn(hiddenSize, visibleSize) * 2 * r - r)\
-                            [:hiddenSize/ds,:visibleSize/ds])
-    dctShrink_cb1 = dct.dct((hiddenSize,))
-    cb1 = theano.shared(dctShrink_cb1.dct(np.zeros(hiddenSize))[:hiddenSize/ds])
-    dctShrink_cb2 = dct.dct((visibleSize,))
-    cb2 = theano.shared(dctShrink_cb2.dct(np.zeros(visibleSize))[:visibleSize/ds])
+    # dctShrink_cW1 = dct.dct((visibleSize, hiddenSize))
+    # cW1 = theano.shared(dctShrink_cW1.dct2(rng.randn(visibleSize, hiddenSize) * 2 * r - r)\
+    #                         [:visibleSize/ds,:hiddenSize/ds])
+    # dctShrink_cW2 = dct.dct((hiddenSize, visibleSize))
+    # cW2 = theano.shared(dctShrink_cW2.dct2(rng.randn(hiddenSize, visibleSize) * 2 * r - r)\
+    #                         [:hiddenSize/ds,:visibleSize/ds])
+    # dctShrink_cb1 = dct.dct((hiddenSize,))
+    # cb1 = theano.shared(dctShrink_cb1.dct(np.zeros(hiddenSize))[:hiddenSize/ds])
+    # dctShrink_cb2 = dct.dct((visibleSize,))
+    # cb2 = theano.shared(dctShrink_cb2.dct(np.zeros(visibleSize))[:visibleSize/ds])
 
     # Create the DCT objects: currShape, targetShape
     dct_cW1 = dct.dct(cW1.shape.eval(), (visibleSize, hiddenSize))
@@ -120,7 +120,7 @@ weightDecayPenalty = (Lambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
 cost = sse + KL_Div + weightDecayPenalty
 
 # Gradient of cost wrt dct coefficients
-grad = T.grad(cost, theta)
+# grad = T.grad(cost, theta)
 # gw1, gb1, gw2, gb2 = T.grad(cost, [cW1, cb1, cW2, cb2]) 
 
 # Compute the cost of a minibatch
@@ -156,7 +156,7 @@ def callbackFn(theta_value):
     # train_losses = [batch_cost(i * batch_size) for i in xrange(n_train_batches)]
     # cW1 = theta[:v*h].reshape((v,h))
     image = PIL.Image.fromarray(tile_raster_images(
-            X=cW1.eval().T,
+            X=dct_cW1.idct2(cW1).eval().T if useDCT else cW1.eval().T,
             img_shape=(28, 28), tile_shape=(14, 14),
             tile_spacing=(1, 1)))
     image.save('images/epoch_%d.png'%callbackFn.epoch)
@@ -179,7 +179,7 @@ training_epochs = 500
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
     f=trainFn,
-    x0=np.concatenate(((rng.randn(2*v*h)*2*r-r).flatten(),np.zeros(v+h))).astype('float32'),
+    x0=np.concatenate(((rng.randn(2*v*h)*2*r-r).flatten(),np.zeros(v+h))).astype('float32'), # TODO: need to do this for useDCT case
     fprime=gradFn,
     callback=callbackFn,
     maxiter=training_epochs)
