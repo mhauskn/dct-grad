@@ -1,3 +1,4 @@
+import sys
 import time
 import numpy as np
 import theano
@@ -19,7 +20,7 @@ beta          = 3     # weight of sparsity penalty term
 spar          = 0.1   # sparsity parameter
 useDCT        = True  # enable dct compression
 ds            = 1.    # downscaling factor
-if useDCT: ds = 10.
+if useDCT: ds = 2.
 
 # Load the dataset
 images, labels = mnist.read(range(10))
@@ -141,7 +142,7 @@ def trainFn(theta_value):
     theta.set_value(theta_value, borrow=True)
     train_losses = [batch_cost(i * batch_size) for i in xrange(n_train_batches)]
     meanLoss = np.mean(train_losses)
-    print meanLoss
+    # print meanLoss
     return meanLoss
 
 def gradFn(theta_value):
@@ -153,14 +154,14 @@ def gradFn(theta_value):
 
 def callbackFn(theta_value):
     theta.set_value(theta_value, borrow=True)
-    # train_losses = [batch_cost(i * batch_size) for i in xrange(n_train_batches)]
-    # cW1 = theta[:v*h].reshape((v,h))
+    train_losses = [batch_cost(i * batch_size) for i in xrange(n_train_batches)]
     image = PIL.Image.fromarray(tile_raster_images(
             X=dct_cW1.idct2(cW1).eval().T if useDCT else cW1.eval().T,
             img_shape=(28, 28), tile_shape=(14, 14),
             tile_spacing=(1, 1)))
     image.save('images/epoch_%d.png'%callbackFn.epoch)
-    # print 'Epoch',callbackFn.epoch,np.mean(train_losses)
+    print 'Epoch',callbackFn.epoch,np.mean(train_losses)
+    sys.stdout.flush()
     callbackFn.epoch += 1
 callbackFn.epoch = 0
 
@@ -175,7 +176,7 @@ callbackFn.epoch = 0
 # predict = theano.function(inputs=[x], outputs=[cost], allow_input_downcast=True)
 # print predict(patches)
 
-training_epochs = 500
+training_epochs = 200
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
     f=trainFn,
