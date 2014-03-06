@@ -1,0 +1,19 @@
+######################################### 
+# 
+# Check the performance as a function of downsampling
+# 
+#########################################
+
++Group = "GRAD" 
++Project = "AI_ROBOTICS"
+
+getenv = true
+Executable = /lusr/bin/python
+Arguments = /u/mhauskn/projects/dct-grad/autoencoder.py --process_num $(Process) --path /u/mhauskn/projects/dct-grad/
+Requirements = Arch == "X86_64" 
+
+Error = /u/mhauskn/projects/dct-grad/results/$(Process).err
+Output = /u/mhauskn/projects/dct-grad/results/$(Process).out
+Log = /u/mhauskn/projects/dct-grad/results/$(Process).log
+
+Queue 200
