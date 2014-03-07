@@ -31,7 +31,7 @@ v             = visibleSize # Effective visual size
 h             = hiddenSize  # Effective hidden size
 path          = args.path
 
-if args.process_num is not None:
+if useDCT and args.process_num is not None:
     assert int(args.process_num) > 0 and int(args.process_num) <= min(visibleSize,hiddenSize)
     v = int(args.process_num) # Effective visual size
     h = int(args.process_num)  # Effective hidden size
@@ -49,11 +49,11 @@ for i in range(len(patches)):
 # train_set, valid_set, test_set = cPickle.load(f)
 # f.close()
 
-def shared_dataset(data_xy):
-    data_x, data_y = data_xy
-    shared_x = theano.shared(np.asarray(data_x, dtype=theano.config.floatX))
-    shared_y = theano.shared(np.asarray(data_y, dtype=theano.config.floatX))
-    return shared_x, T.cast(shared_y, 'int32')
+# def shared_dataset(data_xy):
+#     data_x, data_y = data_xy
+#     shared_x = theano.shared(np.asarray(data_x, dtype=theano.config.floatX))
+#     shared_y = theano.shared(np.asarray(data_y, dtype=theano.config.floatX))
+#     return shared_x, T.cast(shared_y, 'int32')
 
 # test_set_x, test_set_y   = shared_dataset(test_set)
 # valid_set_x, valid_set_y = shared_dataset(valid_set)
@@ -166,11 +166,24 @@ callbackFn.epoch = 0
 # predict = theano.function(inputs=[x], outputs=[cost], allow_input_downcast=True)
 # print predict(patches)
 
+x0 = np.concatenate(((rng.randn(2*v*h)*2*r-r).flatten(),np.zeros(v+h))).astype('float32')
+if useDCT:
+    # Find coefficients that expand to the correct initial weight matrices
+    dctShrink_cW1 = dct.dct((visibleSize, hiddenSize))
+    iW1 = dctShrink_cW1.dct2(rng.randn(visibleSize, hiddenSize) * 2 * r - r)[:v,:h]
+    dctShrink_cW2 = dct.dct((hiddenSize, visibleSize))
+    iW2 = dctShrink_cW2.dct2(rng.randn(hiddenSize, visibleSize) * 2 * r - r)[:h,:v]
+    dctShrink_cb1 = dct.dct((hiddenSize,))
+    ib1 = dctShrink_cb1.dct(np.zeros(hiddenSize))[:h]
+    dctShrink_cb2 = dct.dct((visibleSize,))
+    ib2 = dctShrink_cb2.dct(np.zeros(visibleSize))[:v]
+    x0 = np.concatenate([iW1.flatten(),iW2.flatten(),ib1,ib2]).astype('float32')
+
 training_epochs = 200
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
     f=trainFn,
-    x0=np.concatenate(((rng.randn(2*v*h)*2*r-r).flatten(),np.zeros(v+h))).astype('float32'), # TODO: need to do this for useDCT case
+    x0=x0,
     fprime=gradFn,
     callback=callbackFn,
     maxiter=training_epochs)
