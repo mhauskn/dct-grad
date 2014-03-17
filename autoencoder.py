@@ -36,12 +36,11 @@ trainEpochs  = args.trainEpochs  # How many epochs to train
 useDCT       = nStripes > 0      # Enable dct compression
 
 #================== Load the dataset ==========================#
-images, labels = mnist.read(range(10),'training',path) 
-images = images / 255.        # Remap between [0,1]
-patches = images[:10000]      # Matlab patches use an odd col-major order
-for i in range(len(patches)): # Convert them back over to row-major
-    patches[i,:] = patches[i,:].reshape(28,28).T.flatten()
-train_set_x = theano.shared(np.asarray(patches, dtype=theano.config.floatX))
+images = mnist.read(range(10),'training',path)[0]
+train_set_x = theano.shared(np.asarray(images[:10000], dtype=theano.config.floatX))
+images = mnist.read(range(10),'testing',path)[0]
+test_set_x = theano.shared(np.asarray(images, dtype=theano.config.floatX))
+assert(train_set_x.shape[0].eval() == test_set_x.shape[0].eval())
 
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 batch_size    = nTrain                      # Size of minibatches
@@ -56,7 +55,8 @@ nParams = nWeightParams + nBiasParams
 theta = theano.shared(value=np.zeros(nParams,dtype=theano.config.floatX),name='theta',borrow=True)
 
 if useDCT:
-    print "Performing DCT transform: %d stripes of width %d. %d total parameters."%(nStripes,stripeWidth,nParams)
+    print "Performing DCT transform: %d stripes of width %d. %d total parameters."\
+        %(nStripes,stripeWidth,nParams)
     cW1 = theta[:nDctCoeffs].reshape((nDctRows, hiddenSize))
     cW2 = theta[nDctCoeffs:2*nDctCoeffs].reshape((nDctRows, hiddenSize))
     cb1 = theta[2*nDctCoeffs:2*nDctCoeffs+hiddenSize]
@@ -64,8 +64,6 @@ if useDCT:
 
     dctW1 = dct.dct((visibleSize, hiddenSize)) # Create the DCT transform
     dctW2 = dct.dct((hiddenSize, visibleSize))
-    # dct_cb1 = dct.dct(cb1.shape.eval(), (hiddenSize,))
-    # dct_cb2 = dct.dct(cb2.shape.eval(), (visibleSize,))
 
     E = np.zeros([visibleSize, nDctRows]) # Generate expansion matrix E
     sw = stripeWidth
@@ -73,13 +71,13 @@ if useDCT:
     for i in range(1,nStripes):
         E[i*sw*2-sw/2:i*sw*2+sw/2, sw/2+(i-1)*sw:sw/2+i*sw] = np.identity(sw)
 
-    dW1 = T.dot(E, cW1)    # Expand coefficients
-    dW2 = T.dot(E, cW2).T
+    sE = theano.shared(value=E.astype('float32'),name='E',borrow=True)
+
+    dW1 = T.dot(sE, cW1)   # Expand coefficients
+    dW2 = T.dot(sE, cW2).T
     
     W1 = dctW1.idct2(dW1) # Inverse DCT transform
     W2 = dctW2.idct2(dW2)
-    # b1 = dct_cb1.idct(cb1)
-    # b2 = dct_cb2.idct(cb2)
     b1 = cb1
     b2 = cb2
 
@@ -111,6 +109,12 @@ batch_cost = theano.function( # Compute the cost of a minibatch
     givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]},
     name="batch_cost")
 
+test_cost = theano.function( # Compute the cost of a minibatch
+    inputs=[index],
+    outputs=cost,
+    givens={x:test_set_x[index * batch_size: (index + 1) * batch_size]},
+    name="batch_cost")
+
 batch_grad = theano.function( # Compute the gradient of a minibatch
     inputs=[index],
     outputs=T.grad(cost, theta),
@@ -133,7 +137,8 @@ def gradFn(theta_value):
 def callbackFn(theta_value):
     theta.set_value(theta_value, borrow=True)
     train_losses = [batch_cost(i * batch_size) for i in xrange(nTrainBatches)]
-    print 'Epoch',callbackFn.epoch,np.mean(train_losses)
+    test_losses = [test_cost(i * batch_size) for i in xrange(nTrainBatches)]
+    print 'Epoch %d Train: %f Test: %f'%(callbackFn.epoch,np.mean(train_losses),np.mean(test_losses))
     sys.stdout.flush()
     callbackFn.epoch += 1
 callbackFn.epoch = 0
@@ -146,11 +151,7 @@ if useDCT: # Find coefficients that expand to the correct initial weight matrice
     iW1 = np.dot(E.T,dctShrink_cW1.dct2(rng.randn(visibleSize, hiddenSize)*2*r-r))
     dctShrink_cW2 = dct.dct((hiddenSize, visibleSize))
     iW2 = np.dot(E.T,dctShrink_cW2.dct2(rng.randn(hiddenSize, visibleSize)*2*r-r).T).T
-    dctShrink_cb1 = dct.dct((hiddenSize,))
-    ib1 = dctShrink_cb1.dct(np.zeros(hiddenSize))[:hiddenSize]
-    dctShrink_cb2 = dct.dct((visibleSize,))
-    ib2 = dctShrink_cb2.dct(np.zeros(visibleSize))[:visibleSize]
-    x0 = np.concatenate([iW1.flatten(),iW2.flatten(),ib1,ib2]).astype('float32')
+    x0 = np.concatenate([iW1.flatten(),iW2.flatten(),np.zeros(nBiasParams)]).astype('float32')
 
 #================== Optimize ==========================#
 start = time.time()

@@ -37,6 +37,7 @@ class dct:
         """
         self.transforms = []
         self.inverses = []
+        self.shared_inverses = []
 
         for i in range(len(currShape)):
             if targetShape is None:
@@ -48,9 +49,12 @@ class dct:
                 # Reshape these 
                 t = t[:,:currShape[i]]
                 t_inv = t_inv[:,:currShape[i]]
-            
+
             self.transforms.append(t)
             self.inverses.append(t_inv)
+            t_inv_shared = theano.shared(value=self.inverses[i].astype('float32'),
+                                         name='t_inv_shared',borrow=True)
+            self.shared_inverses.append(t_inv_shared)
 
     def dct(self, x):
         return np.dot(self.transforms[0], x)
@@ -59,7 +63,8 @@ class dct:
         return np.dot(self.transforms[1], np.dot(self.transforms[0], x).T).T
 
     def idct(self, x):
-        return T.dot(self.inverses[0], x)
+        return T.dot(self.shared_inverses[0], x)
 
     def idct2(self, x):
-        return T.dot(self.inverses[1], T.dot(self.inverses[0], x).T).T
+        return T.dot(self.shared_inverses[1], T.dot(self.shared_inverses[0], x).T).T
+

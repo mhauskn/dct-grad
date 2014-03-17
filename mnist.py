@@ -37,4 +37,9 @@ def read(digits, dataset = "training", path = "."):
         images[i] = array(img[ ind[i]*rows*cols : (ind[i]+1)*rows*cols ])
         labels[i] = lbl[ind[i]]
 
+    # Matlab patches use an odd col-major order
+    images = images / 255.        # Remap between [0,1]
+    for i in range(len(images)):  # Convert them back over to row-major
+        images[i,:] = images[i,:].reshape(28,28).T.flatten()
+
     return images, labels
