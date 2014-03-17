@@ -53,3 +53,18 @@ class job:
         s = output.find('** Proc ')+8
         procID = output[s:output.find(':\n',s)]
         return procID
+
+    def runLocal(self):
+        ofile      = self.output.split('=')[1].strip()
+        efile      = self.error.split('=')[1].strip()
+        executable = self.executable.split('=')[1].strip()
+        arguments  = self.arguments.split('=')[1].strip()        
+        z = arguments.split(' ')
+        z.insert(0,executable)
+
+        out = open(ofile,'w')
+        err = open(efile,'w')
+        subprocess.Popen(z,stdout=out,stderr=err).wait()
+        out.close()
+        err.close()
+        
