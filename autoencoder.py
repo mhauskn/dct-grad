@@ -22,18 +22,18 @@ parser.add_argument('--path', required=False, default='.')
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
-visibleSize = 28*28             # Number of input units 
-hiddenSize  = 14*14             # Number of hidden units 
-alpha       = 9e-1              # Learning rate
-Lambda      = 3e-3              # Weight decay term
-beta        = 3                 # Weight of sparsity penalty term       
-spar        = 0.1               # Sparsity parameter
-path        = args.path         # Directory to load/save files
-prefix      = args.outputPrefix # Prefix for output file names
-nStripes    = args.nStripes     # Number of bands of coeffs to learn over
-stripeWidth = args.stripeWidth  # How wide each stripe is
-trainEpochs = args.trainEpochs  # How many epochs to train
-useDCT      = nStripes > 0      # Enable dct compression
+visibleSize  = 28*28             # Number of input units 
+hiddenSize   = 14*14             # Number of hidden units 
+alpha        = 9e-1              # Learning rate
+Lambda       = 3e-3              # Weight decay term
+beta         = 3                 # Weight of sparsity penalty term       
+spar         = 0.1               # Sparsity parameter
+path         = args.path         # Directory to load/save files
+outputPrefix = args.outputPrefix # Prefix for output file names
+nStripes     = args.nStripes     # Number of bands of coeffs to learn over
+stripeWidth  = args.stripeWidth  # How wide each stripe is
+trainEpochs  = args.trainEpochs  # How many epochs to train
+useDCT       = nStripes > 0      # Enable dct compression
 
 #================== Load the dataset ==========================#
 images, labels = mnist.read(range(10),'training',path) 
@@ -164,7 +164,7 @@ end = time.time()
 print 'Elapsed Time(s): ', end - start
 
 #================== Save W1 Image ==========================#
-fname = path + '/results/' + prefix + '.png'
+fname = path + '/results/' + outputPrefix + '.png'
 theta.set_value(opttheta, borrow=True)
 W = dctW1.idct2(T.dot(E,cW1)).eval().T if useDCT else W1.eval().T
 image = PIL.Image.fromarray(tile_raster_images(
