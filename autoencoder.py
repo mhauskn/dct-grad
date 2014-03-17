@@ -40,11 +40,12 @@ images = mnist.read(range(10),'training',path)[0]
 train_set_x = theano.shared(np.asarray(images[:10000], dtype=theano.config.floatX))
 images = mnist.read(range(10),'testing',path)[0]
 test_set_x = theano.shared(np.asarray(images, dtype=theano.config.floatX))
-assert(train_set_x.shape[0].eval() == test_set_x.shape[0].eval())
 
 nTrain        = train_set_x.shape[0].eval() # Number training samples
+nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = nTrain                      # Size of minibatches
 nTrainBatches = nTrain / batch_size         # Number of minibatches
+nTestBatches  = nTest / batch_size          
 
 #================== Initialize Theano Vars ==========================#
 nDctRows = int(stripeWidth * (nStripes-.5)) # Number of rows of dct coeffs we are keeping
@@ -100,7 +101,7 @@ sse = T.sum((a2 - x) ** 2) / (2. * m)
 avgAct = a1.mean(axis=0) # Col-Mean: AvgAct of each hidden unit across all m-examples
 KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))
 weightDecayPenalty = (Lambda/2.) * (T.sum(W1**2) + T.sum(W2**2))
-cost = sse + KL_Div + weightDecayPenalty
+cost = sse + weightDecayPenalty + KL_Div
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
@@ -136,8 +137,8 @@ def gradFn(theta_value):
 
 def callbackFn(theta_value):
     theta.set_value(theta_value, borrow=True)
-    train_losses = [batch_cost(i * batch_size) for i in xrange(nTrainBatches)]
-    test_losses = [test_cost(i * batch_size) for i in xrange(nTrainBatches)]
+    train_losses = [batch_cost(i) for i in xrange(nTrainBatches)]
+    test_losses = [test_cost(i) for i in xrange(nTestBatches)]
     print 'Epoch %d Train: %f Test: %f'%(callbackFn.epoch,np.mean(train_losses),np.mean(test_losses))
     sys.stdout.flush()
     callbackFn.epoch += 1
