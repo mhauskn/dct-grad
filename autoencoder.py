@@ -14,11 +14,13 @@ import argparse
 rng = np.random
 
 parser = argparse.ArgumentParser(description='Testing dct transforms')
-parser.add_argument('--nStripes', required=False, type=int, default=6)
+parser.add_argument('--nStripes', required=False, type=int, default=9)
 parser.add_argument('--stripeWidth', required=False, type=int, default=28)
-parser.add_argument('--trainEpochs', required=False, type=int, default=200)
+parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
+parser.add_argument('--noKLDiv', action='store_true', default=False)
+parser.add_argument('--noWeightCost', action='store_true', default=False)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
@@ -32,7 +34,7 @@ path         = args.path         # Directory to load/save files
 outputPrefix = args.outputPrefix # Prefix for output file names
 nStripes     = args.nStripes     # Number of bands of coeffs to learn over
 stripeWidth  = args.stripeWidth  # How wide each stripe is
-trainEpochs  = args.trainEpochs  # How many epochs to train
+trainEpochs  = args.nEpochs      # How many epochs to train
 useDCT       = nStripes > 0      # Enable dct compression
 
 #================== Load the dataset ==========================#
@@ -97,11 +99,15 @@ a2 = T.nnet.sigmoid(T.dot(a1, W2) + b2)
 
 #================== Compute Cost ==========================#
 m = x.shape[0]           # Number training examples
-sse = T.sum((a2 - x) ** 2) / (2. * m)
-avgAct = a1.mean(axis=0) # Col-Mean: AvgAct of each hidden unit across all m-examples
-KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))
-weightDecayPenalty = (Lambda/2.) * (T.sum(W1**2) + T.sum(W2**2))
-cost = sse + weightDecayPenalty + KL_Div
+cost = T.sum((a2 - x) ** 2) / (2. * m) # Sum of squared errors
+
+if not args.noKLDiv:
+    avgAct = a1.mean(axis=0) # Col-Mean: AvgAct of each hidden unit across all m-examples
+    KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))
+    cost += KL_Div
+if not args.noWeightCost:
+    weightDecayPenalty = (Lambda/2.) * (T.sum(W1**2) + T.sum(W2**2))
+    cost += weightDecayPenalty
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
