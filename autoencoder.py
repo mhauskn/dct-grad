@@ -4,6 +4,7 @@ import numpy as np
 import theano
 import theano.tensor as T
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import dct
 import mnist
 from utils import tile_raster_images
@@ -21,6 +22,7 @@ parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
 parser.add_argument('--noKLDiv', action='store_true', default=False)
 parser.add_argument('--noWeightCost', action='store_true', default=False)
+parser.add_argument('--dataDCT', action='store_true', default=False)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
@@ -35,12 +37,15 @@ outputPrefix = args.outputPrefix # Prefix for output file names
 nStripes     = args.nStripes     # Number of bands of coeffs to learn over
 stripeWidth  = args.stripeWidth  # How wide each stripe is
 trainEpochs  = args.nEpochs      # How many epochs to train
+dataDCT      = args.dataDCT      # Performs DCT transform on the dataset
 useDCT       = nStripes > 0      # Enable dct compression
 
 #================== Load the dataset ==========================#
-images = mnist.read(range(10),'training',path)[0]
+if dataDCT: print 'Applying 2d-DCT transform to the dataset.'
+images = mnist.read(range(10),'training',path, dataDCT)[0]
+# plt.imshow(images[0,:].reshape(28,28), cmap=cm.Greys_r)
 train_set_x = theano.shared(np.asarray(images[:10000], dtype=theano.config.floatX))
-images = mnist.read(range(10),'testing',path)[0]
+images = mnist.read(range(10),'testing',path, dataDCT)[0]
 test_set_x = theano.shared(np.asarray(images, dtype=theano.config.floatX))
 
 nTrain        = train_set_x.shape[0].eval() # Number training samples
@@ -100,7 +105,7 @@ a2 = T.nnet.sigmoid(T.dot(a1, W2) + b2)
 #================== Compute Cost ==========================#
 m = x.shape[0]           # Number training examples
 cost = T.sum((a2 - x) ** 2) / (2. * m) # Sum of squared errors
-
+# TODO: Consider Cross Entropy Loss
 if not args.noKLDiv:
     avgAct = a1.mean(axis=0) # Col-Mean: AvgAct of each hidden unit across all m-examples
     KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))

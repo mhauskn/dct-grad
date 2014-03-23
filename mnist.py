@@ -1,8 +1,9 @@
 import os, struct
+import dct
 from array import array as pyarray
 from numpy import append, array, int8, uint8, zeros
 
-def read(digits, dataset = "training", path = "."):
+def read(digits, dataset = "training", path = ".", applyDCT = False):
     """
     Loads MNIST files into 3D numpy arrays
 
@@ -38,8 +39,15 @@ def read(digits, dataset = "training", path = "."):
         labels[i] = lbl[ind[i]]
 
     # Matlab patches use an odd col-major order
-    images = images / 255.        # Remap between [0,1]
+    images = images / 255. # Remap between [0,1]        
     for i in range(len(images)):  # Convert them back over to row-major
         images[i,:] = images[i,:].reshape(28,28).T.flatten()
 
+    # Apply a 2-D DCT transform to the image if desired
+    if applyDCT:
+        imgDCT = dct.dct((28,28))
+        for i in range(len(images)):
+            images[i,:] = imgDCT.dct2(images[i,:].reshape(28,28)).flatten()
+            # Consider: Normalizing Contrast
+        
     return images, labels
