@@ -18,6 +18,6 @@ for stripe in range(1,nStripes):
     cj.setOutputPrefix('%s/results/reshape%d'%(expDir,stripe))
     cj.runLocal() if local else cj.submit()
     
-    cj.setArgs('%s/dct-grad/rectangleAE.py --compression %f --path %s --outputPrefix rectangle%d'%(expDir,perc,expDir,stripe))
+    cj.setArgs('%s/rectangleAE.py --compression %f --path %s --outputPrefix rectangle%d'%(expDir,perc,expDir,stripe))
     cj.setOutputPrefix('%s/results/rectangle%d'%(expDir,stripe))
     cj.runLocal() if local else cj.submit()
