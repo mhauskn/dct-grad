@@ -2,7 +2,8 @@
 import condor, socket, subprocess
 
 nStripes = 10
-cj = condor.job('python')
+execStr = 'python' if socket.gethostname() == 'drogba' else '/lusr/bin/python'
+cj = condor.job(execStr)
 for stripe in range(1,nStripes):
     cj.setArgs('/home/matthew/projects/dct-grad/stripeAE.py --nStripes %d --path /home/matthew/projects/dct-grad/ --outputPrefix stripe%d'%(stripe,stripe))
     cj.setOutputPrefix('/home/matthew/projects/dct-grad/results/stripe%d'%stripe)
