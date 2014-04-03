@@ -1,7 +1,5 @@
-import time
-import sys
+import time, sys, numpy as np
 from itertools import *
-import numpy as np
 import theano
 import theano.tensor as T
 import mnist
@@ -17,6 +15,8 @@ parser.add_argument('--weights', required=False, type=str, default='weights.mat'
 parser.add_argument('--path', required=False, default='.')
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
+parser.add_argument('--load', required=False, type=str)
+parser.add_argument('--save', required=False, type=str)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
@@ -71,10 +71,8 @@ assert(n == nParams)
 index = T.lscalar()      # Index into the batch of training examples
 x = T.matrix('x')        # Training data
 y = T.ivector('y')       # Training labels
-#a1 = T.nnet.sigmoid(T.dot(x, W1) + b1)
-a1 = T.maximum(0,T.dot(x, W1) + b1)
-#a2 = T.nnet.sigmoid(T.dot(a1, W2) + b2)
-a2 = T.maximum(0,T.dot(a1, W2) + b2)
+a1 = T.nnet.sigmoid(T.dot(x, W1) + b1)
+a2 = T.nnet.sigmoid(T.dot(a1, W2) + b2)
 p_y_given_x = T.nnet.softmax(T.dot(a2, W3) + b3)
 cost = -T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), y])
 y_pred = T.argmax(p_y_given_x, axis=1)
@@ -136,7 +134,11 @@ callbackFn.epoch = 0
 r = np.sqrt(6) / np.sqrt(visibleSize+hiddenSize+1)
 x0 = (rng.randn(nParams)*2*r-r).astype('float32')
 # opttheta = np.asarray(scipy.io.loadmat(weightFile)['opttheta'].flatten(), dtype=theano.config.floatX) 
-# x0[:len(opttheta)] = opttheta
+
+if args.load:
+    print 'Loading parameters from file', args.load
+    p = pickle.load(open(args.load,'rb'))
+    x0[:len(p)] = p
 
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
@@ -148,7 +150,9 @@ opttheta = scipy.optimize.fmin_cg(
 end = time.time()
 print 'Elapsed Time(s): ', end - start
 
-# opttheta = np.asarray(scipy.io.loadmat(weightFile)['opttheta'].flatten(), dtype=theano.config.floatX) 
+#================== Save Weights ==========================#
+if args.save:
+    pickle.dump(opttheta, open(args.save, 'wb'))
 
 #================== Save W1 Image ==========================#
 fname = path + '/results/' + outputPrefix + 'W1.png'
