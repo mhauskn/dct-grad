@@ -1,16 +1,4 @@
-import sys
-import time
-import numpy as np
-import theano
-import theano.tensor as T
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import dct
-import mnist
-from utils import tile_raster_images
-import PIL.Image
-import scipy.optimize
-import argparse
+import sys, time, theano, dct, mnist, scipy.optimize, argparse, PIL.Image, numpy as np, theano.tensor as T, matplotlib.pyplot as plt, matplotlib.cm as cm, utils, pickle
 
 rng = np.random
 
@@ -19,15 +7,17 @@ parser.add_argument('--compression', required=False, type=float, default=.5)
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
+parser.add_argument('--load', required=False, type=str)
+parser.add_argument('--save', required=False, type=str)
 parser.add_argument('--noKLDiv', action='store_true', default=False)
 parser.add_argument('--noWeightCost', action='store_true', default=False)
+parser.add_argument('--noDCTWeightCost', action='store_true', default=False)
 parser.add_argument('--dataDCT', action='store_true', default=False)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
 visibleSize   = 28*28                # Number of input units 
 hiddenSize    = 14*14                # Number of hidden units 
-alpha         = 9e-1                 # Learning rate
 Lambda        = 3e-3                 # Weight decay term
 beta          = 3                    # Weight of sparsity penalty term       
 spar          = 0.1                  # Sparsity parameter
@@ -37,12 +27,12 @@ outputPrefix  = args.outputPrefix    # Prefix for output file names
 trainEpochs   = args.nEpochs         # How many epochs to train
 dataDCT       = args.dataDCT         # Performs DCT transform on the dataset
 useDCT        = 0 < compression <= 1 # Enable dct compression
-nWeightParams = 2*visibleSize*hiddenSize
-nBiasParams   = visibleSize + hiddenSize
-nParams       = nWeightParams + nBiasParams
 inputShape    = (28, 28)
 W1Shape       = (visibleSize, hiddenSize)
 W2Shape       = (hiddenSize, visibleSize)
+nWeightParams = 2*visibleSize*hiddenSize
+nBiasParams   = visibleSize + hiddenSize
+nParams       = nWeightParams + nBiasParams
 
 #================== Load the dataset ==========================#
 if dataDCT: print 'Applying 2d-DCT transform to the dataset.'
@@ -66,7 +56,8 @@ if useDCT:
     dctWeightSize = dctW1Shape[0]*dctW1Shape[1]
     nDCTParams = 2*dctWeightSize + nBiasParams
 
-    theta = theano.shared(value=np.zeros(nDCTParams,dtype=theano.config.floatX),name='theta',borrow=True)
+    theta = theano.shared(value=np.zeros(nDCTParams,dtype=theano.config.floatX),
+                          name='theta',borrow=True)
 
     print "Learning in DCT space\n%d total parameters (%f%%)\nDCT input shape"\
         %(nDCTParams,100.*nDCTParams/nParams), dctW1Shape
@@ -100,12 +91,18 @@ m = x.shape[0]           # Number training examples
 cost = T.sum((a2 - x) ** 2) / (2. * m) # Sum of squared errors
 # TODO: Consider Cross Entropy Loss
 if not args.noKLDiv:
+    print 'Using KL-Divergence Cost'
     avgAct = a1.mean(axis=0) # Col-Mean: AvgAct of each hidden unit across all m-examples
     KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))
     cost += KL_Div
 if not args.noWeightCost:
+    print 'Using Standard Weight Penalty'
     weightDecayPenalty = (Lambda/2.) * (T.sum(W1**2) + T.sum(W2**2))
     cost += weightDecayPenalty
+if not args.noDCTWeightCost:
+    print 'Using DCT-Weight Penalty'
+    dctWeightDecayPenalty = (Lambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
+    cost += dctWeightDecayPenalty
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
@@ -149,16 +146,21 @@ def callbackFn(theta_value):
 callbackFn.epoch = 0
 
 #================== Initialize Weights & Biases ==========================#
-r = np.sqrt(6) / np.sqrt(visibleSize+hiddenSize+1)
-x0 = np.concatenate(((rng.randn(nWeightParams)*2*r-r).flatten(),np.zeros(nBiasParams))).astype('float32')
-if useDCT:
-    x0w1 = x0[:visibleSize*hiddenSize].reshape(W1Shape)
-    dctShrink_cW1 = dct.dct(W1Shape)
-    iW1 = dctShrink_cW1.dct2(x0w1)[:dctW1Shape[0],:dctW1Shape[1]]
-    x0w2 = x0[visibleSize*hiddenSize:2*visibleSize*hiddenSize].reshape(W2Shape)
-    dctShrink_cW2 = dct.dct(W2Shape)
-    iW2 = dctShrink_cW2.dct2(x0w2)[:dctW2Shape[0],:dctW2Shape[1]]
-    x0 = np.concatenate([iW1.flatten(),iW2.flatten(),np.zeros(nBiasParams)]).astype('float32')
+if args.load:
+    print 'Loading parameters from file', args.load
+    x0 = pickle.load(open(args.load,'rb'))
+else:
+    r = np.sqrt(6) / np.sqrt(visibleSize+hiddenSize+1)
+    x0 = np.concatenate(((rng.randn(nWeightParams)*2*r-r).flatten(),
+                         np.zeros(nBiasParams))).astype('float32')
+    if useDCT:
+        x0w1 = x0[:visibleSize*hiddenSize].reshape(W1Shape)
+        dctShrink_cW1 = dct.dct(W1Shape)
+        iW1 = dctShrink_cW1.dct2(x0w1)[:dctW1Shape[0],:dctW1Shape[1]]
+        x0w2 = x0[visibleSize*hiddenSize:2*visibleSize*hiddenSize].reshape(W2Shape)
+        dctShrink_cW2 = dct.dct(W2Shape)
+        iW2 = dctShrink_cW2.dct2(x0w2)[:dctW2Shape[0],:dctW2Shape[1]]
+        x0 = np.concatenate([iW1.flatten(),iW2.flatten(),np.zeros(nBiasParams)]).astype('float32')
 
 #================== Optimize ==========================#
 start = time.time()
@@ -171,10 +173,14 @@ opttheta = scipy.optimize.fmin_cg(
 end = time.time()
 print 'Elapsed Time(s): ', end - start
 
+#================== Save Weights ==========================#
+if args.save:
+    pickle.dump(opttheta, open(args.save, 'wb'))
+
 #================== Save W1 Image ==========================#
 fname = path + '/results/' + outputPrefix + '.png'
 theta.set_value(opttheta, borrow=True)
-image = PIL.Image.fromarray(tile_raster_images(
+image = PIL.Image.fromarray(utils.tile_raster_images(
         X=W1.eval().T,
         img_shape=(28, 28), tile_shape=(14, 14),
         tile_spacing=(1, 1)))
