@@ -21,15 +21,18 @@ parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
 parser.add_argument('--noKLDiv', action='store_true', default=False)
 parser.add_argument('--noWeightCost', action='store_true', default=False)
+parser.add_argument('--noDCTWeightCost', action='store_true', default=False)
 parser.add_argument('--dataDCT', action='store_true', default=False)
+parser.add_argument('--Lambda', required=False, type=float, default=3e-3)
+parser.add_argument('--dctLambda', required=False, type=float, default=3e-3)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
 inputShape    = (28, 28)          # Dimensionality of input 
 visibleSize   = 28*28             # Number of input units 
 hiddenSize    = 14*14             # Number of hidden units 
-alpha         = 9e-1              # Learning rate
-Lambda        = 3e-3              # Weight decay term
+Lambda        = args.Lambda              # Weight decay term
+dctLambda     = args.dctLambda              # DCT-Weight decay term
 beta          = 3                 # Weight of sparsity penalty term       
 spar          = 0.1               # Sparsity parameter
 compression   = args.compression  # Percentage compression
@@ -102,12 +105,18 @@ m = x.shape[0]           # Number training examples
 cost = T.sum((a2 - x) ** 2) / (2. * m) # Sum of squared errors
 # TODO: Consider Cross Entropy Loss
 if not args.noKLDiv:
+    print 'Using KL-Divergence Cost. Gain:', beta
     avgAct = a1.mean(axis=0) # Col-Mean: AvgAct of each hidden unit across all m-examples
     KL_Div = beta * T.sum(spar * T.log(spar/avgAct) + (1-spar) * T.log((1-spar)/(1-avgAct)))
     cost += KL_Div
 if not args.noWeightCost:
+    print 'Using Standard Weight Penalty. Gain:', Lambda
     weightDecayPenalty = (Lambda/2.) * (T.sum(W1**2) + T.sum(W2**2))
     cost += weightDecayPenalty
+if not args.noDCTWeightCost:
+    print 'Using DCT-Weight Penalty. Gain:', dctLambda
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
+    cost += dctWeightDecayPenalty
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
