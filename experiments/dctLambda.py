@@ -8,11 +8,11 @@ cj = condor.job(execStr)
 dctLambda = 3e-4
 while dctLambda < 3e2:
     cj.setArgs('%s/reshapingAE.py --path %s --outputPrefix dctLambda%f --dctLambda %f'%(expDir,expDir,dctLambda,dctLambda))
-    cj.setOutputPrefix('%s/results/dctLambda%f'%(expDir,stripe,dctLambda))
+    cj.setOutputPrefix('%s/results/dctLambda%f'%(expDir,dctLambda))
     cj.runLocal() if local else cj.submit()
 
     cj.setArgs('%s/reshapingAE.py --noWeightCost --path %s --outputPrefix dctLambdaNoWTCost%f --dctLambda %f'%(expDir,expDir,dctLambda,dctLambda))
-    cj.setOutputPrefix('%s/results/dctLambdaNoWtCost%f'%(expDir,stripe,dctLambda))
+    cj.setOutputPrefix('%s/results/dctLambdaNoWtCost%f'%(expDir,dctLambda))
     cj.runLocal() if local else cj.submit()
 
     dctLambda *= 10
