@@ -115,14 +115,16 @@ if not args.noWeightCost:
     cost += weightDecayPenalty
 if not args.noDCTWeightCost:
     print 'Using DCT-Weight Penalty. Gain:', dctLambda
-    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
+    pdf = np.vectorize(scipy.stats.norm().pdf)
+
+    wtmp = np.outer(pdf(np.linspace(0,2,dctShape[0])),pdf(np.linspace(0,2,dctShape[1])))
+    cWPenalty = 1.-(wtmp/np.max(wtmp))
+    # Flatten and tile this into a matrix of size [dctVisibleSize, hiddenSize]
+    
+    penW = theano.shared(value=cWPenalty.astype('float32'),borrow=True)    
+
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2)))
     cost += dctWeightDecayPenalty
-    # cW1Penalty = np.tile(np.arange(0,1,1./dctVisibleSize), (hiddenSize,1)).T
-    # penW1 = theano.shared(value=cW1Penalty.astype('float32'),borrow=True)    
-    # cW2Penalty = np.tile(np.arange(0,1,1./dctVisibleSize), (hiddenSize,1))
-    # penW2 = theano.shared(value=cW2Penalty.astype('float32'),borrow=True)
-    # dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2)))
-    # cost += dctWeightDecayPenalty
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
