@@ -102,14 +102,21 @@ if not args.noWeightCost:
     cost += weightDecayPenalty
 if not args.noDCTWeightCost:
     print 'Using DCT-Weight Penalty. Gain:', dctLambda
-    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
-    cost += dctWeightDecayPenalty
-    # cW1Penalty = np.tile(np.arange(0,1,1./dctVisibleSize), (hiddenSize,1)).T
-    # penW1 = theano.shared(value=cW1Penalty.astype('float32'),borrow=True)    
-    # cW2Penalty = np.tile(np.arange(0,1,1./dctVisibleSize), (hiddenSize,1))
-    # penW2 = theano.shared(value=cW2Penalty.astype('float32'),borrow=True)
-    # dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2)))
+    # dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(cW1**2) + T.sum(cW2**2))
     # cost += dctWeightDecayPenalty
+    pdf = np.vectorize(scipy.stats.norm().pdf)
+
+    w1tmp = np.outer(pdf(np.linspace(0,2,dctW1Shape[0])),pdf(np.linspace(0,2,dctW1Shape[1])))
+    cW1Penalty = 1.-(w1tmp/np.max(w1tmp))
+    
+    w2tmp = np.outer(pdf(np.linspace(0,2,dctW2Shape[0])),pdf(np.linspace(0,2,dctW2Shape[1])))
+    cW2Penalty = 1.-(w2tmp/np.max(w2tmp))
+    
+    penW1 = theano.shared(value=cW1Penalty.astype('float32'),borrow=True)    
+    penW2 = theano.shared(value=cW2Penalty.astype('float32'),borrow=True)
+
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2)))
+    cost += dctWeightDecayPenalty
 
 
 #================== Theano Functions ==========================#
