@@ -28,19 +28,19 @@ parser.add_argument('--dctLambda', required=False, type=float, default=3e-3)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
-inputShape    = (28, 28)          # Dimensionality of input 
-visibleSize   = 28*28             # Number of input units 
-hiddenSize    = 14*14             # Number of hidden units 
-Lambda        = args.Lambda              # Weight decay term
-dctLambda     = args.dctLambda              # DCT-Weight decay term
-beta          = 3                 # Weight of sparsity penalty term       
-spar          = 0.1               # Sparsity parameter
-compression   = args.compression  # Percentage compression
-path          = args.path         # Directory to load/save files
-outputPrefix  = args.outputPrefix # Prefix for output file names
-trainEpochs   = args.nEpochs      # How many epochs to train
-dataDCT       = args.dataDCT      # Performs DCT transform on the dataset
-useDCT        = 0 < compression <= 1  # Enable dct compression
+inputShape    = (28, 28)             # Dimensionality of input 
+visibleSize   = 28*28                # Number of input units 
+hiddenSize    = 14*14                # Number of hidden units 
+Lambda        = args.Lambda          # Weight decay term
+dctLambda     = args.dctLambda       # DCT-Weight decay term
+beta          = 3                    # Weight of sparsity penalty term       
+spar          = 0.1                  # Sparsity parameter
+compression   = args.compression     # Percentage compression
+path          = args.path            # Directory to load/save files
+outputPrefix  = args.outputPrefix    # Prefix for output file names
+trainEpochs   = args.nEpochs         # How many epochs to train
+dataDCT       = args.dataDCT         # Performs DCT transform on the dataset
+useDCT        = 0 < compression <= 1 # Enable dct compression
 nWeightParams = 2*visibleSize*hiddenSize
 nBiasParams   = visibleSize + hiddenSize
 nParams       = nWeightParams + nBiasParams
@@ -117,13 +117,14 @@ if not args.noDCTWeightCost:
     print 'Using DCT-Weight Penalty. Gain:', dctLambda
     pdf = np.vectorize(scipy.stats.norm().pdf)
 
+    # Create the penalty gaussian for the dct-image
     wtmp = np.outer(pdf(np.linspace(0,2,dctShape[0])),pdf(np.linspace(0,2,dctShape[1])))
-    cWPenalty = 1.-(wtmp/np.max(wtmp))
+    imgPenalty = 1.-(wtmp/np.max(wtmp))
     # Flatten and tile this into a matrix of size [dctVisibleSize, hiddenSize]
-    
+    cWPenalty = np.tile(imgPenalty.flatten(),(hiddenSize,1)).T
     penW = theano.shared(value=cWPenalty.astype('float32'),borrow=True)    
 
-    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2)))
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW * (cW1**2)) + T.sum(penW.T * (cW2**2)))
     cost += dctWeightDecayPenalty
 
 #================== Theano Functions ==========================#
