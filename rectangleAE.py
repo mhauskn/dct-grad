@@ -115,7 +115,7 @@ if not args.noDCTWeightCost:
     penW1 = theano.shared(value=cW1Penalty.astype('float32'),borrow=True)    
     penW2 = theano.shared(value=cW2Penalty.astype('float32'),borrow=True)
 
-    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2)))
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW1 * T.abs_(cW1)) + T.sum(penW2 * T.abs_(cW2)))
     cost += dctWeightDecayPenalty
 
 
