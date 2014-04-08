@@ -1,5 +1,18 @@
 import tempfile, subprocess
 
+def getEnv():
+    import socket
+    if socket.getfqdn().endswith('tacc.utexas.edu'):
+        j = TaccJob('python')
+        expDir = '/home/01904/mhauskn/dct-grad'
+    elif socket.getfqdn().endswith('cs.utexas.edu'):
+        j = CondorJob('/lusr/bin/python')
+        expDir = '/u/mhauskn/projects/dct-grad'
+    else: # Assume local execution
+        j = Job('python')
+        expDir = '/home/matthew/projects/dct-grad'
+    return j, expDir
+
 class Job:
     def __init__(self, executable, args=''):
         self.executable = executable
