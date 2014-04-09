@@ -116,7 +116,7 @@ if not args.noWeightCost:
 if not args.noDCTWeightCost:
     print 'Using DCT-Weight Penalty. Gain:', dctLambda
 
-    dctWeightDecayPenalty = (dctLambda/2.) * (T.nonzero_values(cW1).shape[0] + T.nonzero_values(cW2).shape[0])
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(T.abs_(cW1)) + T.sum(T.abs_(cW2)))
     cost += dctWeightDecayPenalty
 
 #================== Theano Functions ==========================#
