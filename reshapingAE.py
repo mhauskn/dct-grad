@@ -115,16 +115,8 @@ if not args.noWeightCost:
     cost += weightDecayPenalty
 if not args.noDCTWeightCost:
     print 'Using DCT-Weight Penalty. Gain:', dctLambda
-    pdf = np.vectorize(scipy.stats.norm().pdf)
 
-    # Create the penalty gaussian for the dct-image
-    wtmp = np.outer(pdf(np.linspace(0,2,dctShape[0])),pdf(np.linspace(0,2,dctShape[1])))
-    imgPenalty = 1.-(wtmp/np.max(wtmp))
-    # Flatten and tile this into a matrix of size [dctVisibleSize, hiddenSize]
-    cWPenalty = np.tile(imgPenalty.flatten(),(hiddenSize,1)).T
-    penW = theano.shared(value=cWPenalty.astype('float32'),borrow=True)    
-
-    dctWeightDecayPenalty = (dctLambda/2.) * (T.sum(penW * T.abs_(cW1)) + T.sum(penW.T * T.abs_(cW2)))
+    dctWeightDecayPenalty = (dctLambda/2.) * (T.nonzero_values(cW1).shape[0] + T.nonzero_values(cW2).shape[0])
     cost += dctWeightDecayPenalty
 
 #================== Theano Functions ==========================#
