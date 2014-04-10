@@ -3,10 +3,11 @@ import cluster
 
 j, expDir = cluster.getEnv()
 
-Lambda = 3e-6
+Lambda = 3e-4
 while Lambda < 3e3:
-    j.setArgs('%s/train.py --autoencoder autoencoder --path %s --outputPrefix ae%f --Lambda %f'%(expDir,expDir,Lambda,Lambda))
-    j.setOutputPrefix('%s/results/reshapingAE%f'%(expDir,Lambda))
+    pre = 'ae' + str(Lambda)
+    j.setArgs('%s/train.py --autoencoder autoencoder --path %s --outputPrefix %s --Lambda %f'%(expDir,expDir,pre,Lambda))
+    j.setOutputPrefix('%s/results/%s'%(expDir,pre))
     j.submit()
 
     Lambda *= 10

@@ -2,6 +2,8 @@ import numpy as np
 import theano
 import theano.tensor as T
 import dct
+import PIL.Image
+from utils import tile_raster_images
 
 rng = np.random
 
@@ -14,12 +16,12 @@ def reconstructionCost(x, a):
 
 class Autoencoder():
     def __init__(self, visibleSize, hiddenSize):
-        self.nWeightParams = 2*visibleSize*hiddenSize
-        self.nBiasParams   = visibleSize + hiddenSize
-        self.nParams       = self.nWeightParams + self.nBiasParams
-        print "Direct Autoencoder\n%d total parameters"%self.nParams
+        nWeightParams = 2*visibleSize*hiddenSize
+        nBiasParams   = visibleSize + hiddenSize
+        nParams       = nWeightParams + nBiasParams
+        print "Direct Autoencoder\n%d total parameters"%nParams
 
-        self.theta = theano.shared(value=np.zeros(self.nParams,dtype=theano.config.floatX),
+        self.theta = theano.shared(value=np.zeros(nParams,dtype=theano.config.floatX),
                                    name='theta',borrow=True)
         self.W1 = self.theta[:visibleSize*hiddenSize].reshape((visibleSize, hiddenSize))
         self.W2 = self.theta[visibleSize*hiddenSize:2*visibleSize*hiddenSize].reshape((hiddenSize,visibleSize))
@@ -27,7 +29,7 @@ class Autoencoder():
         self.b2 = self.theta[2*visibleSize*hiddenSize+hiddenSize:]
 
         r = np.sqrt(6) / np.sqrt(visibleSize+hiddenSize+1)
-        self.x0 = np.concatenate(((rng.randn(self.nWeightParams)*2*r-r).flatten(),np.zeros(self.nBiasParams))).astype('float32')
+        self.x0 = np.concatenate(((rng.randn(nWeightParams)*2*r-r).flatten(),np.zeros(nBiasParams))).astype('float32')
 
     def forward(self, x):
         a1 = T.nnet.sigmoid(T.dot(x, self.W1) + self.b1)
@@ -35,10 +37,10 @@ class Autoencoder():
         return a1, a2
 
     def weightCost(self):
-        return T.sum(self.W1**2) + T.sum(self.W2**2)
+        return T.sum(self.W1**2) + T.sum(self.W2**2) # L2
+        # return T.sum(T.abs_(self.W1)) + T.sum(T.abs_(self.W2)) # L1
         
-    def saveImage(self, outputPrefix, opttheta):
-        fname = path + '/results/' + outputPrefix + '.png'
+    def saveImage(self, fname, opttheta):
         self.theta.set_value(opttheta, borrow=True)
         image = PIL.Image.fromarray(tile_raster_images(
                 X=self.W1.eval().T,

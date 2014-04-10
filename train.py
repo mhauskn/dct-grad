@@ -6,11 +6,11 @@ import theano.tensor as T
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import mnist
-from utils import tile_raster_images
-import PIL.Image
 import scipy.optimize
 import argparse
+from itertools import *
 from autoencoder import *
+from softmax import *
 
 parser = argparse.ArgumentParser(description='Testing dct transforms')
 parser.add_argument('--autoencoder', required=False, type=str, default='autoencoder')
@@ -39,48 +39,67 @@ dataDCT       = args.dataDCT         # Performs DCT transform on the dataset
 aeType        = args.autoencoder     # What type of autoencoder
 
 #================== Load the dataset ==========================#
-if dataDCT: print 'Applying 2d-DCT transform to the dataset.'
-images = mnist.read(range(10),'training',path, dataDCT)[0]
-# plt.imshow(images[0,:].reshape(28,28), cmap=cm.Greys_r)
-train_set_x = theano.shared(np.asarray(images[:10000], dtype=theano.config.floatX))
-images = mnist.read(range(10),'testing',path, dataDCT)[0]
-test_set_x = theano.shared(np.asarray(images, dtype=theano.config.floatX))
+def shared_dataset(data_xy, borrow=True):
+    data_x, data_y = data_xy
+    data_y = np.fromiter(chain.from_iterable(data_y), dtype='int')
+    shared_x = theano.shared(np.asarray(data_x,dtype=theano.config.floatX),borrow=borrow)
+    shared_y = theano.shared(np.asarray(data_y,dtype=theano.config.floatX),borrow=borrow)
+    return shared_x, T.cast(shared_y, 'int32')
+
+train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',path))
+test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',path))
 
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = nTrain                      # Size of minibatches
-nTrainBatches = nTrain / batch_size         # Number of minibatches
-nTestBatches  = nTest / batch_size          
+nTrainBatches = 1
+nTestBatches  = 1
 
-if aeType == 'autoencoder': ae = Autoencoder(visibleSize, hiddenSize)
-elif aeType == 'rectangle': ae = RectangleAE(visibleSize, hiddenSize)
-elif aeType == 'stripe':    ae = StripeAE(visibleSize, hiddenSize)
-elif aeType == 'reshape':   ae = ReshapeAE(visibleSize, hiddenSize, inputShape)
-else: assert(False)
+# if aeType == 'autoencoder': ae = Autoencoder(visibleSize, hiddenSize)
+# elif aeType == 'rectangle': ae = RectangleAE(visibleSize, hiddenSize)
+# elif aeType == 'stripe':    ae = StripeAE(visibleSize, hiddenSize)
+# elif aeType == 'reshape':   ae = ReshapeAE(visibleSize, hiddenSize, inputShape)
+# else: assert(False)
+
+ae = Softmax(visibleSize,10)
 
 index = T.lscalar()      # Index into the batch of training examples
 x = T.matrix('x')        # Training data 
-a1, a2 = ae.forward(x)   # Forward Propagate
-cost = reconstructionCost(x,a2) + beta * sparsityCost(a1,spar) + Lambda * ae.weightCost()
+y = T.ivector('y')
+#a1, a2 = ae.forward(x)   # Forward Propagate
+pred = ae.forward(x)
+#cost = reconstructionCost(x,a2) + beta * sparsityCost(a1,spar) + Lambda * ae.weightCost()
+cost = xentCost(pred,y)
+accuracy = ae.getAccuracy(pred,y)
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
     inputs=[index],
     outputs=cost,
-    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]},
+    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size],
+            y:train_set_y[index * batch_size: (index + 1) * batch_size]},
     name="batch_cost")
 
 test_cost = theano.function( # Compute the cost of a minibatch
     inputs=[index],
     outputs=cost,
-    givens={x:test_set_x[index * batch_size: (index + 1) * batch_size]},
+    givens={x:test_set_x[index * batch_size: (index + 1) * batch_size],
+            y:test_set_y[index * batch_size: (index + 1) * batch_size]},
     name="batch_cost")
 
 batch_grad = theano.function( # Compute the gradient of a minibatch
     inputs=[index],
     outputs=T.grad(cost, ae.theta),
-    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size]},
+    givens={x:train_set_x[index * batch_size: (index + 1) * batch_size],
+            y:train_set_y[index * batch_size: (index + 1) * batch_size]},
     name="batch_grad")
+
+test_model = theano.function(
+    inputs=[index],
+    outputs=accuracy,
+    givens={x:test_set_x[index * batch_size: (index + 1) * batch_size],
+            y:test_set_y[index * batch_size: (index + 1) * batch_size]},
+    name="test_model")
 
 def trainFn(theta_value):
     ae.theta.set_value(theta_value, borrow=True)
@@ -99,7 +118,8 @@ def callbackFn(theta_value):
     ae.theta.set_value(theta_value, borrow=True)
     train_losses = [batch_cost(i) for i in xrange(nTrainBatches)]
     test_losses = [test_cost(i) for i in xrange(nTestBatches)]
-    print 'Epoch %d Train: %f Test: %f'%(callbackFn.epoch,np.mean(train_losses),np.mean(test_losses))
+    test_acc = [test_model(i) for i in xrange(nTestBatches)]
+    print 'Epoch %d Train: %f Test: %f Accuracy: %.2f'%(callbackFn.epoch,np.mean(train_losses),np.mean(test_losses),100*(1-np.mean(test_acc)))
     sys.stdout.flush()
     callbackFn.epoch += 1
 callbackFn.epoch = 0
@@ -115,4 +135,5 @@ opttheta = scipy.optimize.fmin_cg(
 end = time.time()
 print 'Elapsed Time(s): ', end - start
 
-ae.saveImage(outputPrefix, opttheta)
+fname = path+'/results/'+outputPrefix+'.png'
+ae.saveImage(fname, opttheta)
