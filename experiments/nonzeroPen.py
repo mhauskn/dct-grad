@@ -3,10 +3,10 @@ import cluster
 
 j, expDir = cluster.getEnv()
 
-dctLambda = 3e-6
-while dctLambda < 3e3:
-    j.setArgs('%s/reshapingAE.py --noWeightCost --path %s --outputPrefix reshapingAE%f --dctLambda %f'%(expDir,expDir,dctLambda,dctLambda))
-    j.setOutputPrefix('%s/results/reshapingAE%f'%(expDir,dctLambda))
+Lambda = 3e-6
+while Lambda < 3e3:
+    j.setArgs('%s/train.py --autoencoder autoencoder --path %s --outputPrefix ae%f --Lambda %f'%(expDir,expDir,Lambda,Lambda))
+    j.setOutputPrefix('%s/results/reshapingAE%f'%(expDir,Lambda))
     j.submit()
 
-    dctLambda *= 10
+    Lambda *= 10

@@ -18,12 +18,10 @@ parser.add_argument('--compression', required=False, type=float, default=.5)
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
-parser.add_argument('--noKLDiv', action='store_true', default=False)
-parser.add_argument('--noWeightCost', action='store_true', default=False)
-parser.add_argument('--noDCTWeightCost', action='store_true', default=False)
 parser.add_argument('--dataDCT', action='store_true', default=False)
+parser.add_argument('--beta', required=False, type=float, default=3)
+parser.add_argument('--spar', required=False, type=float, default=.1)
 parser.add_argument('--Lambda', required=False, type=float, default=3e-3)
-parser.add_argument('--dctLambda', required=False, type=float, default=3e-3)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
@@ -31,9 +29,8 @@ inputShape    = (28, 28)             # Dimensionality of input
 visibleSize   = 28*28                # Number of input units 
 hiddenSize    = 14*14                # Number of hidden units 
 Lambda        = args.Lambda          # Weight decay term
-dctLambda     = args.dctLambda       # DCT-Weight decay term
-beta          = 3                    # Weight of sparsity penalty term       
-spar          = 0.1                  # Sparsity parameter
+beta          = args.beta            # Weight of sparsity penalty term       
+spar          = args.spar            # Sparsity parameter
 compression   = args.compression     # Percentage compression
 path          = args.path            # Directory to load/save files
 outputPrefix  = args.outputPrefix    # Prefix for output file names
@@ -55,17 +52,11 @@ batch_size    = nTrain                      # Size of minibatches
 nTrainBatches = nTrain / batch_size         # Number of minibatches
 nTestBatches  = nTest / batch_size          
 
-if aeType == 'autoencoder':
-    ae = Autoencoder(visibleSize, hiddenSize)
-elif aeType == 'rectangle':
-    ae = RectangleAE(visibleSize, hiddenSize)
-elif aeType == 'stripe':
-    ae = StripeAE(visibleSize, hiddenSize)
-elif aeType == 'reshape':
-    ae = ReshapeAE(visibleSize, hiddenSize, inputShape)
-else:
-    print 'Got unexpected autoencoder type', aeType
-    exit()
+if aeType == 'autoencoder': ae = Autoencoder(visibleSize, hiddenSize)
+elif aeType == 'rectangle': ae = RectangleAE(visibleSize, hiddenSize)
+elif aeType == 'stripe':    ae = StripeAE(visibleSize, hiddenSize)
+elif aeType == 'reshape':   ae = ReshapeAE(visibleSize, hiddenSize, inputShape)
+else: assert(False)
 
 index = T.lscalar()      # Index into the batch of training examples
 x = T.matrix('x')        # Training data 
