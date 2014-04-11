@@ -13,22 +13,35 @@ def xentCost(p_y_given_x, y):
 
 class Softmax():
     def __init__(self, visibleSize, nClasses):
-        nWeightParams = visibleSize * nClasses
-        nBiasParams = nClasses
-        nParams = nWeightParams + nBiasParams
-        print "Softmax Classifier\n%d total parameters"%nParams
-        self.theta = theano.shared(value=np.zeros(nParams,dtype=theano.config.floatX),name='theta',borrow=True)
-        self.W = self.theta[:visibleSize*nClasses].reshape((visibleSize,nClasses))
-        self.b = self.theta[visibleSize*nClasses:]
+        self.visibleSize = visibleSize
+        self.nClasses = nClasses
+        self.nWeightParams = visibleSize * nClasses
+        self.nBiasParams = nClasses
+        self.nParams = self.nWeightParams + self.nBiasParams
 
-        r = np.sqrt(6) / np.sqrt(nWeightParams)
-        self.x0 = np.concatenate(((rng.randn(nWeightParams)*2*r-r).flatten(),np.zeros(nBiasParams))).astype('float32')
+    def getNParams(self):
+        return self.nParams
+
+    def getx0(self):
+        r = np.sqrt(6) / np.sqrt(self.nWeightParams)
+        return np.concatenate(((rng.randn(self.nWeightParams)*2*r-r).flatten(),
+                               np.zeros(self.nBiasParams)))
+
+    def setTheta(self, theta):
+        self.W = theta[:self.visibleSize*self.nClasses].reshape((self.visibleSize,self.nClasses))
+        self.b = theta[self.visibleSize*self.nClasses:]
 
     def forward(self, x):
         p_y_given_x = T.nnet.softmax(T.dot(x, self.W) + self.b)
         return p_y_given_x
 
-    def getAccuracy(self, p_y_given_x, y):
+    def accuracy(self, p_y_given_x, y):
         y_pred = T.argmax(p_y_given_x, axis=1)
         accuracy = T.mean(T.neq(y_pred, y))
         return accuracy
+
+    def cost(self, x, output, labels):
+        return xentCost(output, labels)
+
+    def __str__(self):
+        return "Softmax Classifier. %d parameters"%self.nParams

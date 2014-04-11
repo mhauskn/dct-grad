@@ -11,9 +11,11 @@ import argparse
 from itertools import *
 from autoencoder import *
 from softmax import *
+from model import *
 
 parser = argparse.ArgumentParser(description='Testing dct transforms')
 parser.add_argument('--autoencoder', required=False, type=str, default='autoencoder')
+parser.add_argument('--classify', action='store_true', default=False)
 parser.add_argument('--compression', required=False, type=float, default=.5)
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
@@ -37,6 +39,7 @@ outputPrefix  = args.outputPrefix    # Prefix for output file names
 trainEpochs   = args.nEpochs         # How many epochs to train
 dataDCT       = args.dataDCT         # Performs DCT transform on the dataset
 aeType        = args.autoencoder     # What type of autoencoder
+nStripes      = 9                    # Number of stripes for the stripeAE
 
 #================== Load the dataset ==========================#
 def shared_dataset(data_xy, borrow=True):
@@ -48,29 +51,31 @@ def shared_dataset(data_xy, borrow=True):
 
 train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',path))
 test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',path))
-
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
-batch_size    = nTrain                      # Size of minibatches
-nTrainBatches = 1
-nTestBatches  = 1
+batch_size    = 10000                      # Size of minibatches
+nTrainBatches = max(1,nTrain/batch_size)
+nTestBatches  = max(1,nTest/batch_size)
 
-# if aeType == 'autoencoder': ae = Autoencoder(visibleSize, hiddenSize)
-# elif aeType == 'rectangle': ae = RectangleAE(visibleSize, hiddenSize)
-# elif aeType == 'stripe':    ae = StripeAE(visibleSize, hiddenSize)
-# elif aeType == 'reshape':   ae = ReshapeAE(visibleSize, hiddenSize, inputShape)
-# else: assert(False)
+if aeType == 'autoencoder': ae = Autoencoder(visibleSize, hiddenSize, beta, spar, Lambda)
+elif aeType == 'rectangle': ae = RectangleAE(visibleSize, hiddenSize, compression, beta, spar, Lambda)
+elif aeType == 'stripe':    ae = StripeAE(visibleSize, hiddenSize, nStripes, beta, spar, Lambda)
+elif aeType == 'reshape':   ae = ReshapeAE(visibleSize, hiddenSize, inputShape, compression, beta, spar, Lambda)
+else: assert(False)
 
-ae = Softmax(visibleSize,10)
-
-index = T.lscalar()      # Index into the batch of training examples
-x = T.matrix('x')        # Training data 
-y = T.ivector('y')
-#a1, a2 = ae.forward(x)   # Forward Propagate
-pred = ae.forward(x)
-#cost = reconstructionCost(x,a2) + beta * sparsityCost(a1,spar) + Lambda * ae.weightCost()
-cost = xentCost(pred,y)
-accuracy = ae.getAccuracy(pred,y)
+model = Model()
+model.addLayer(ae)
+if args.classify:
+    classifier = Softmax(visibleSize,10)
+    model.addLayer(classifier)
+model.finalize()
+index = T.lscalar()                     # Index into the batch of training examples
+x = T.matrix('x')                       # Training data 
+y = T.ivector('y')                      # Vector of labels
+output = model.forward(x)               # Run the model
+cost = model.cost(x,output,y)           # Get the cost
+if model.hasClassifier:                 # Find the accuracy
+    accuracy = model.accuracy(output,y) 
 
 #================== Theano Functions ==========================#
 batch_cost = theano.function( # Compute the cost of a minibatch
@@ -78,62 +83,72 @@ batch_cost = theano.function( # Compute the cost of a minibatch
     outputs=cost,
     givens={x:train_set_x[index * batch_size: (index + 1) * batch_size],
             y:train_set_y[index * batch_size: (index + 1) * batch_size]},
-    name="batch_cost")
+    on_unused_input='ignore', name="batch_cost")
 
 test_cost = theano.function( # Compute the cost of a minibatch
     inputs=[index],
     outputs=cost,
     givens={x:test_set_x[index * batch_size: (index + 1) * batch_size],
             y:test_set_y[index * batch_size: (index + 1) * batch_size]},
-    name="batch_cost")
+    on_unused_input='ignore', name="test_cost")
 
 batch_grad = theano.function( # Compute the gradient of a minibatch
     inputs=[index],
-    outputs=T.grad(cost, ae.theta),
+    outputs=T.grad(cost, model.theta),
     givens={x:train_set_x[index * batch_size: (index + 1) * batch_size],
             y:train_set_y[index * batch_size: (index + 1) * batch_size]},
-    name="batch_grad")
+    on_unused_input='ignore', name="batch_grad")
 
-test_model = theano.function(
-    inputs=[index],
-    outputs=accuracy,
-    givens={x:test_set_x[index * batch_size: (index + 1) * batch_size],
-            y:test_set_y[index * batch_size: (index + 1) * batch_size]},
-    name="test_model")
+if model.hasClassifier:
+    test_model = theano.function(
+        inputs=[index],
+        outputs=accuracy,
+        givens={x:test_set_x[index * batch_size: (index + 1) * batch_size],
+                y:test_set_y[index * batch_size: (index + 1) * batch_size]},
+        name="test_model")
+
+epoch = 0
 
 def trainFn(theta_value):
-    ae.theta.set_value(theta_value, borrow=True)
-    train_losses = [batch_cost(i * batch_size) for i in xrange(nTrainBatches)]
-    meanLoss = np.mean(train_losses)
-    return meanLoss
+    model.setTheta(theta_value)
+    loss = batch_cost(0)
+    for i in xrange(1, nTrainBatches):
+        loss += batch_cost(i)
+    return loss / nTrainBatches
 
 def gradFn(theta_value):
-    ae.theta.set_value(theta_value, borrow=True)
+    model.setTheta(theta_value)
     grad = batch_grad(0)
     for i in xrange(1, nTrainBatches):
-        grad += batch_grad(i * batch_size)
-    return grad / nTrainBatches
+        grad += batch_grad(i)
+    if type(grad) == theano.sandbox.cuda.CudaNdarray:
+        return np.array(grad.__array__()) / nTrainBatches
+    else:
+        return grad / nTrainBatches
 
 def callbackFn(theta_value):
-    ae.theta.set_value(theta_value, borrow=True)
+    global epoch
+    model.setTheta(theta_value)
     train_losses = [batch_cost(i) for i in xrange(nTrainBatches)]
     test_losses = [test_cost(i) for i in xrange(nTestBatches)]
-    test_acc = [test_model(i) for i in xrange(nTestBatches)]
-    print 'Epoch %d Train: %f Test: %f Accuracy: %.2f'%(callbackFn.epoch,np.mean(train_losses),np.mean(test_losses),100*(1-np.mean(test_acc)))
+    print('Epoch %d Train: %f Test: %f'%(epoch,np.mean(train_losses),np.mean(test_losses))),
+    if model.hasClassifier:
+        test_acc = [test_model(i) for i in xrange(nTestBatches)]
+        print 'Accuracy: %.2f'%(100*(1-np.mean(test_acc)))
+    else: print ''
     sys.stdout.flush()
-    callbackFn.epoch += 1
-callbackFn.epoch = 0
+    epoch += 1
 
 #================== Optimize ==========================#
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
     f=trainFn,
-    x0=ae.x0,
+    x0=model.getx0(),
     fprime=gradFn,
     callback=callbackFn,
     maxiter=trainEpochs)
 end = time.time()
 print 'Elapsed Time(s): ', end - start
 
-fname = path+'/results/'+outputPrefix+'.png'
-ae.saveImage(fname, opttheta)
+fname = path+'/results/'+outputPrefix
+model.saveImages(fname, opttheta)
