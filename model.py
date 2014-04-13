@@ -1,6 +1,7 @@
 import numpy as np
 import theano
 import theano.tensor as T
+import pickle
 
 class Model():
     def __init__(self):
@@ -43,6 +44,13 @@ class Model():
 
     def accuracy(self, output, labels):
         return self.layers[-1].accuracy(output, labels)
+
+    def save(self, fname='model.pkl'):
+        pickle.dump(self.__dict__,open(fname,'wb'))
+
+    def load(self, fname='model.pkl'):
+        tmp = pickle.load(open(fname,'rb'))
+        self.__dict__.update(tmp)
 
     def saveImages(self, path, opttheta):
         self.setTheta(opttheta)

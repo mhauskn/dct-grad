@@ -24,6 +24,8 @@ parser.add_argument('--dataDCT', action='store_true', default=False)
 parser.add_argument('--beta', required=False, type=float, default=3)
 parser.add_argument('--spar', required=False, type=float, default=.1)
 parser.add_argument('--Lambda', required=False, type=float, default=3e-3)
+parser.add_argument('--save', required=False, type=str)
+parser.add_argument('--load', required=False, type=str)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
@@ -57,17 +59,26 @@ batch_size    = 10000                      # Size of minibatches
 nTrainBatches = max(1,nTrain/batch_size)
 nTestBatches  = max(1,nTest/batch_size)
 
-if aeType == 'autoencoder': ae = Autoencoder(visibleSize, hiddenSize, beta, spar, Lambda)
-elif aeType == 'rectangle': ae = RectangleAE(visibleSize, hiddenSize, compression, beta, spar, Lambda)
-elif aeType == 'stripe':    ae = StripeAE(visibleSize, hiddenSize, nStripes, beta, spar, Lambda)
-elif aeType == 'reshape':   ae = ReshapeAE(visibleSize, hiddenSize, inputShape, compression, beta, spar, Lambda)
-else: assert(False)
-
 model = Model()
-model.addLayer(ae)
-if args.classify:
-    classifier = Softmax(visibleSize,10)
-    model.addLayer(classifier)
+if args.load:
+    fname = args.load
+    print 'Loading model from',fname
+    model.load(fname)
+else:
+    if aeType == 'autoencoder':
+        ae = Autoencoder(visibleSize, hiddenSize, beta, spar, Lambda)
+    elif aeType == 'rectangle':
+        ae = RectangleAE(visibleSize, hiddenSize, compression, beta, spar, Lambda)
+    elif aeType == 'stripe':
+        ae = StripeAE(visibleSize, hiddenSize, nStripes, beta, spar, Lambda)
+    elif aeType == 'reshape':
+        ae = ReshapeAE(visibleSize, hiddenSize, inputShape, compression, beta, spar, Lambda)
+    else: assert(False)
+    model.addLayer(ae)
+    if args.classify:
+        classifier = Softmax(visibleSize,10)
+        model.addLayer(classifier)
+
 model.finalize()
 index = T.lscalar()                     # Index into the batch of training examples
 x = T.matrix('x')                       # Training data 
@@ -121,10 +132,11 @@ def gradFn(theta_value):
     grad = batch_grad(0)
     for i in xrange(1, nTrainBatches):
         grad += batch_grad(i)
-    if type(grad) == theano.sandbox.cuda.CudaNdarray:
-        return np.array(grad.__array__()) / nTrainBatches
-    else:
+    try:
         return grad / nTrainBatches
+    except:
+        if type(grad) == theano.sandbox.cuda.CudaNdarray:
+            return np.array(grad.__array__()) / nTrainBatches
 
 def callbackFn(theta_value):
     global epoch
@@ -152,3 +164,7 @@ print 'Elapsed Time(s): ', end - start
 
 fname = path+'/results/'+outputPrefix
 model.saveImages(fname, opttheta)
+
+if args.save:
+    print 'Saving model to', args.save
+    model.save(args.save)
