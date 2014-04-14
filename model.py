@@ -8,18 +8,14 @@ class Model():
         self.layers = []
         self.params = []
         self.hasClassifier = False
+        self.theta = theano.shared(value=[], name='theta', borrow=True)
 
     def addLayer(self,layer):
         self.layers.append(layer)
         self.params.append(layer.getNParams())
         self.hasClassifier = hasattr(layer,'accuracy') and callable(getattr(layer,'accuracy'))
-
-    def finalize(self):
-        totalParams = int(np.sum(self.params))
-        if not hasattr(self, 'theta'): 
-            self.theta = theano.shared(value=np.zeros(totalParams,dtype=theano.config.floatX),
-                                       name='theta',borrow=True)
-            self.setTheta(self.getx0())
+        newtheta = np.concatenate([self.theta.get_value(), layer.getx0()]).astype('float32')
+        self.theta = theano.shared(value=newtheta, name='theta', borrow=True)
 
     def setTheta(self, theta_value):
         self.theta.set_value(theta_value, borrow=True)
