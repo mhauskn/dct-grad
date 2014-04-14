@@ -14,6 +14,15 @@ def sparsityCost(a1, spar):
 def reconstructionCost(x, a):
     return T.sum((a - x) ** 2) / (2. * x.shape[0])
 
+def testReconstruction(data, autoencoder):
+    dataAct = autoencoder.forward(data)
+    dataCost = reconstructionCost(data, dataAct).eval()
+    bogus = rng.random(data.shape)
+    bogusAct = autoencoder.forward(bogus)
+    bogusCost = reconstructionCost(bogus, bogusAct).eval()
+    print 'Data Reconstruction Cost:', dataCost
+    print 'Random Reconstruction Cost:', bogusCost
+
 class Autoencoder(object):
     def __init__(self, visibleSize, hiddenSize, beta=3, spar=.1, Lambda=3e-3):
         self.visibleSize   = visibleSize

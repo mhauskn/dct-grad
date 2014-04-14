@@ -168,3 +168,5 @@ model.saveImages(fname, opttheta)
 if args.save:
     print 'Saving model to', args.save
     model.save(args.save)
+
+testReconstruction(test_set_x.get_value(), ae)
