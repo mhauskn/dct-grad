@@ -1,0 +1,15 @@
+#! /usr/bin/env python
+import experiments.cluster as cluster
+import sys
+
+j, expDir = cluster.getEnv()
+
+args = sys.argv[1:]
+
+if not '--path' in args: 
+    args.append('--path')
+    args.append(expDir)
+
+j.setArgs(' '.join(args))
+j.setOutputPrefix('%s/results/job'%expDir)
+j.submit()
