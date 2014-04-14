@@ -56,8 +56,8 @@ test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',path))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = 10000                      # Size of minibatches
-nTrainBatches = max(1,nTrain/batch_size)
-nTestBatches  = max(1,nTest/batch_size)
+nTrainBatches = 1#max(1,nTrain/batch_size)
+nTestBatches  = 1#max(1,nTest/batch_size)
 
 model = Model()
 if args.load:
@@ -75,11 +75,13 @@ else:
         ae = ReshapeAE(visibleSize, hiddenSize, inputShape, compression, beta, spar, Lambda)
     else: assert(False)
     model.addLayer(ae)
-    if args.classify:
-        classifier = Softmax(visibleSize,10)
-        model.addLayer(classifier)
+
+if args.classify and not model.hasClassifier:
+    classifier = Softmax(visibleSize,10)
+    model.addLayer(classifier)
 
 model.finalize()
+
 index = T.lscalar()                     # Index into the batch of training examples
 x = T.matrix('x')                       # Training data 
 y = T.ivector('y')                      # Vector of labels
@@ -105,7 +107,7 @@ test_cost = theano.function( # Compute the cost of a minibatch
 
 batch_grad = theano.function( # Compute the gradient of a minibatch
     inputs=[index],
-    outputs=T.grad(cost, model.theta),
+    outputs=T.grad(cost, model.getTheta()),
     givens={x:train_set_x[index * batch_size: (index + 1) * batch_size],
             y:train_set_y[index * batch_size: (index + 1) * batch_size]},
     on_unused_input='ignore', name="batch_grad")
@@ -155,7 +157,7 @@ def callbackFn(theta_value):
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
     f=trainFn,
-    x0=model.theta.get_value(),
+    x0=model.getTheta().get_value(),
     fprime=gradFn,
     callback=callbackFn,
     maxiter=trainEpochs)
