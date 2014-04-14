@@ -7,22 +7,20 @@ class Model():
     def __init__(self):
         self.layers = []
         self.params = []
+        self.hasClassifier = False
 
     def addLayer(self,layer):
         self.layers.append(layer)
         self.params.append(layer.getNParams())
+        self.hasClassifier = hasattr(layer,'accuracy') and callable(getattr(layer,'accuracy'))
 
     def finalize(self):
         totalParams = int(np.sum(self.params))
-        self.theta = theano.shared(value=np.zeros(totalParams,dtype=theano.config.floatX),
-                                   name='theta',borrow=True)
-        self.setTheta(self.getx0())
-        self.hasClassifier = hasattr(self.layers[-1],'accuracy') and \
-            callable(getattr(self.layers[-1],'accuracy'))
+        if not hasattr(self, 'theta'): 
+            self.theta = theano.shared(value=np.zeros(totalParams,dtype=theano.config.floatX),
+                                       name='theta',borrow=True)
+            self.setTheta(self.getx0())
 
-        for i in xrange(len(self.layers)):
-            print 'Layer %d:'%(i), self.layers[i]
-        
     def setTheta(self, theta_value):
         self.theta.set_value(theta_value, borrow=True)
         n = 0
@@ -60,3 +58,7 @@ class Model():
             if hasattr(l,'saveImage') and callable(getattr(l,'saveImage')):
                 l.saveImage(fname)
                     
+    def __str__(self):
+        for i in xrange(len(self.layers)):
+            print 'Layer %d:'%(i), self.layers[i]
+        

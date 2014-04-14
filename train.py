@@ -155,7 +155,7 @@ def callbackFn(theta_value):
 start = time.time()
 opttheta = scipy.optimize.fmin_cg(
     f=trainFn,
-    x0=model.getx0(),
+    x0=model.theta.get_value(),
     fprime=gradFn,
     callback=callbackFn,
     maxiter=trainEpochs)
