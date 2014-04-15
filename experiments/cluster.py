@@ -101,6 +101,8 @@ class TaccJob(Job):
         f.write(self.executable+' '+self.arguments+'\n')
         f.flush()
         jobFile = f.name
-        subprocess.Popen(["sbatch",jobFile],stdout=subprocess.PIPE).communicate()[0]   
+        output = subprocess.Popen(["sbatch",jobFile],stdout=subprocess.PIPE).communicate()[0]
         f.close()
-        
+        start = output.find('Submitted batch job ')+len('Submitted batch job ')
+        procID = output[start:output.find('\n',start)]
+        return procID
