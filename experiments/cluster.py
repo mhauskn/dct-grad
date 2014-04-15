@@ -81,6 +81,7 @@ class TaccJob(Job):
         Job.__init__(self, executable, args)
         self.hours = 0
         self.minutes = 30
+        self.dep = None
 
     def setJobTime(self, hours, minutes):
         assert(minutes < 60 and minutes >= 0)
@@ -88,16 +89,22 @@ class TaccJob(Job):
         self.hours = hours
         self.minutes = minutes
 
+    def depends(self, pid):
+        self.dep = pid
+
     def submit(self):
         f = tempfile.NamedTemporaryFile()
         f.write('#!/bin/bash\n')
         f.write('#SBATCH -J dct-grad\n')
         f.write('#SBATCH -o '+self.output+'\n')
-        f.write('#SBATCH -e '+self.error+'\n')        
+        #f.write('#SBATCH -e '+self.error+'\n')        
         f.write('#SBATCH -p gpu\n')
         f.write('#SBATCH -N 1\n')
         f.write('#SBATCH -n 20\n')
         f.write('#SBATCH -t '+str(self.hours)+':'+str(self.minutes)+':00\n')        
+        if self.dep:
+            f.write('#SBATCH -d '+self.dep+'\n')            
+            self.dep = None
         f.write(self.executable+' '+self.arguments+'\n')
         f.flush()
         jobFile = f.name

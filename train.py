@@ -51,8 +51,9 @@ def shared_dataset(data_xy, borrow=True):
     shared_y = theano.shared(np.asarray(data_y,dtype=theano.config.floatX),borrow=borrow)
     return shared_x, T.cast(shared_y, 'int32')
 
-train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',path))
-test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',path))
+datapath = path + '/data/'
+train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',datapath))
+test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',datapath))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = 10000                      # Size of minibatches
