@@ -56,8 +56,8 @@ test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',path))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = 10000                      # Size of minibatches
-nTrainBatches = 1#max(1,nTrain/batch_size)
-nTestBatches  = 1#max(1,nTest/batch_size)
+nTrainBatches = max(1,nTrain/batch_size)
+nTestBatches  = max(1,nTest/batch_size)
 
 model = Model()
 if args.load:
@@ -171,4 +171,4 @@ if args.save:
     print 'Saving model to', args.save
     model.save(args.save)
 
-testReconstruction(test_set_x.get_value(), ae)
+

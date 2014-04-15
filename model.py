@@ -15,17 +15,15 @@ class Model():
         self.params.append(layer.getNParams())
         self.hasClassifier = hasattr(layer,'accuracy') and callable(getattr(layer,'accuracy'))
         lx0 = layer.getx0()
-        assert len(lx0) == layer.getNParams()
         newtheta = np.concatenate([self.theta.get_value(), lx0]).astype('float32')
         self.theta.set_value(newtheta)
-        # layer.setTheta(self.theta[len(newtheta)-len(lx0):])
-        assert len(self.theta.get_value()) == np.sum(self.params)
 
     def finalize(self):
         n = 0
         for l,p in zip(self.layers,self.params):
             l.setTheta(self.theta[n:n+p])
             n += p
+        print self
 
     def getTheta(self):
         return self.theta
@@ -68,8 +66,5 @@ class Model():
                 l.saveImage(fname)
                     
     def __str__(self):
-        s = ''
-        for i in xrange(len(self.layers)):
-            s += 'Layer %d: '%(i) + self.layers[i].__str__() + '\n'
-        return s
+        return '\n'.join(['Layer %d: '%(i) + l.__str__() for i, l in enumerate(self.layers)])
         
