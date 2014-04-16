@@ -2,6 +2,7 @@ import numpy as np
 import theano
 import theano.tensor as T
 import dct
+import scipy.stats
 import PIL.Image
 from utils import tile_raster_images
 
@@ -112,7 +113,7 @@ class RectangleAE(Autoencoder):
         return T.sum(self.cW1**2) + T.sum(self.cW2**2)
 
     def l1WeightCost(self):
-        return T.sum(T.abs_(cW1)) + T.sum(T.abs_(cW2))
+        return T.sum(T.abs_(self.cW1)) + T.sum(T.abs_(self.cW2))
 
     def freqWeightedL2Cost(self):
         pdf = np.vectorize(scipy.stats.norm().pdf)
@@ -122,7 +123,7 @@ class RectangleAE(Autoencoder):
         cW2Penalty = 1.-(w2tmp/np.max(w2tmp))
         penW1 = theano.shared(value=cW1Penalty.astype('float32'),borrow=True) #TODO: Declare earlier
         penW2 = theano.shared(value=cW2Penalty.astype('float32'),borrow=True) #TODO: Declare earlier
-        return T.sum(penW1 * (cW1**2)) + T.sum(penW2 * (cW2**2))
+        return T.sum(penW1 * (self.cW1**2)) + T.sum(penW2 * (self.cW2**2))
         
     def __str__(self):
         return "RectangleAE learning in DCT space. %d parameters"%(self.nDCTParams)
@@ -246,21 +247,21 @@ class ReshapeAE(Autoencoder):
                                  outputs_info=None,
                                  sequences=[self.cW2])
 
-        def l2WeightCost(self):
-            return T.sum(self.cW1**2) + T.sum(self.cW2**2)
+    def l2WeightCost(self):
+        return T.sum(self.cW1**2) + T.sum(self.cW2**2)
 
-        def l1WeightCost(self):
-            return T.sum(T.abs_(self.cW1)) + T.sum(T.abs_(self.cW2))
+    def l1WeightCost(self):
+        return T.sum(T.abs_(self.cW1)) + T.sum(T.abs_(self.cW2))
 
-        def freqWeightedL2Cost(self):
-            pdf = np.vectorize(scipy.stats.norm().pdf)
-            # Create the penalty gaussian for the dct-image
-            wtmp = np.outer(pdf(np.linspace(0,2,self.dctShape[0])),pdf(np.linspace(0,2,self.dctShape[1])))
-            imgPenalty = 1.-(wtmp/np.max(wtmp))
-            # Flatten and tile this into a matrix of size [dctVisibleSize, hiddenSize]
-            cWPenalty = np.tile(imgPenalty.flatten(),(self.hiddenSize,1)).T
-            penW = theano.shared(value=cWPenalty.astype('float32'),borrow=True) #TODO: Remove?
-            return T.sum(penW * (self.cW1**2)) + T.sum(penW.T * (self.cW2**2))
+    def freqWeightedL2Cost(self):
+        pdf = np.vectorize(scipy.stats.norm().pdf)
+        # Create the penalty gaussian for the dct-image
+        wtmp = np.outer(pdf(np.linspace(0,2,self.dctShape[0])),pdf(np.linspace(0,2,self.dctShape[1])))
+        imgPenalty = 1.-(wtmp/np.max(wtmp))
+        # Flatten and tile this into a matrix of size [dctVisibleSize, hiddenSize]
+        cWPenalty = np.tile(imgPenalty.flatten(),(self.hiddenSize,1)).T
+        penW = theano.shared(value=cWPenalty.astype('float32'),borrow=True) #TODO: Remove?
+        return T.sum(penW * (self.cW1**2)) + T.sum(penW.T * (self.cW2**2))
 
     def __str__(self):
         return "ReshapeAE learning in DCT space. %d parameters"%(self.nDCTParams)
