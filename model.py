@@ -7,22 +7,45 @@ class Model():
     def __init__(self):
         self.layers = []
         self.params = []
+        self.frozen = []
         self.hasClassifier = False
         self.theta = theano.shared(value=np.zeros(0,dtype=theano.config.floatX), name='theta', borrow=True)
 
     def addLayer(self,layer):
         self.layers.append(layer)
         self.params.append(layer.getNParams())
+        self.frozen.append(False)
         self.hasClassifier = hasattr(layer,'accuracy') and callable(getattr(layer,'accuracy'))
         lx0 = layer.getx0()
         newtheta = np.concatenate([self.theta.get_value(), lx0]).astype('float32')
         self.theta.set_value(newtheta)
 
+    def deleteLayer(self):
+        assert len(self.layers) > 0
+        l = self.layers.pop()
+        p = self.params.pop()
+        self.theta.set_value(self.theta.get_value()[:-p])
+        self.hasClassifier = hasattr(self.layers[-1],'accuracy') and \
+                             callable(getattr(self.layers[-1],'accuracy'))
+
+    def freezeLayer(self, indx):
+        assert indx >= 0 and indx < len(self.layers)
+        self.frozen[indx] = True
+        n = 0
+        for i, l in enumerate(self.layers):
+            p = self.params[i]
+            if i == indx:
+                l.setTheta(self.theta[n:n+p])
+                t = self.theta.get_value()
+                self.theta.set_value(np.concatenate([t[:n],t[n+p:]]).astype('float32'))
+            n += p
+
     def finalize(self):
         n = 0
-        for l,p in zip(self.layers,self.params):
-            l.setTheta(self.theta[n:n+p])
-            n += p
+        for l,p,frozen in zip(self.layers,self.params,self.frozen):
+            if not frozen:
+                l.setTheta(self.theta[n:n+p])
+                n += p
         print self
 
     def getTheta(self):
@@ -44,8 +67,8 @@ class Model():
             a = l.forward(a)
         return a
 
-    def cost(self, x, output, labels):
-        return self.layers[-1].cost(x, output, labels)
+    # def cost(self, x, output, labels):
+    #     return self.costFn(x, output, labels)
 
     def accuracy(self, output, labels):
         return self.layers[-1].accuracy(output, labels)
@@ -59,11 +82,10 @@ class Model():
 
     def saveImages(self, path, opttheta):
         self.setTheta(opttheta)
-        for i in xrange(len(self.layers)):
-            l = self.layers[i]
-            fname = path + 'L' + str(i) + '.png'
-            if hasattr(l,'saveImage') and callable(getattr(l,'saveImage')):
-                l.saveImage(fname)
+        l = self.layers[0]
+        fname = path + '.png'
+        if hasattr(l,'saveImage') and callable(getattr(l,'saveImage')):
+            l.saveImage(fname)
                     
     def __str__(self):
         return '\n'.join(['Layer %d: '%(i) + l.__str__() for i, l in enumerate(self.layers)])

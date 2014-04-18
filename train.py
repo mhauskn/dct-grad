@@ -9,9 +9,10 @@ import mnist
 import scipy.optimize
 import argparse
 from itertools import *
-from autoencoder import *
-from softmax import *
+# from autoencoder import *
+# from softmax import *
 from model import *
+from layer import *
 
 parser = argparse.ArgumentParser(description='Testing dct transforms')
 parser.add_argument('--autoencoder', required=False, type=str, default='autoencoder')
@@ -65,29 +66,43 @@ if args.load:
     fname = args.load
     print 'Loading model from',fname
     model.load(fname)
-else:
-    if aeType == 'autoencoder':
-        ae = Autoencoder(visibleSize, hiddenSize, beta, spar, Lambda)
-    elif aeType == 'rectangle':
-        ae = RectangleAE(visibleSize, hiddenSize, compression, beta, spar, Lambda)
-    elif aeType == 'stripe':
-        ae = StripeAE(visibleSize, hiddenSize, nStripes, beta, spar, Lambda)
-    elif aeType == 'reshape':
-        ae = ReshapeAE(visibleSize, hiddenSize, inputShape, compression, beta, spar, Lambda)
-    else: assert(False)
-    model.addLayer(ae)
+# else:
+#     if aeType == 'autoencoder':
+#         ae = Autoencoder(visibleSize, hiddenSize, beta, spar, Lambda)
+#     elif aeType == 'rectangle':
+#         ae = RectangleAE(visibleSize, hiddenSize, compression, beta, spar, Lambda)
+#     elif aeType == 'stripe':
+#         ae = StripeAE(visibleSize, hiddenSize, nStripes, beta, spar, Lambda)
+#     elif aeType == 'reshape':
+#         ae = ReshapeAE(visibleSize, hiddenSize, inputShape, compression, beta, spar, Lambda)
+#     else: assert(False)
+#     model.addLayer(ae)
+
+l1 = Layer(visibleSize, hiddenSize)
+model.addLayer(l1)
+l2 = Layer(hiddenSize, visibleSize, activation=None)
+model.addLayer(l2)
+
+# model.deleteLayer()
 
 if args.classify and not model.hasClassifier:
-    classifier = Softmax(visibleSize,10)
+    classifier = Softmax(hiddenSize,10)
     model.addLayer(classifier)
-
+model.freezeLayer(0)
 model.finalize()
 
 index = T.lscalar()                     # Index into the batch of training examples
 x = T.matrix('x')                       # Training data 
 y = T.ivector('y')                      # Vector of labels
 output = model.forward(x)               # Run the model
-cost = model.cost(x,output,y)           # Get the cost
+
+if args.classify:
+    cost = xentCost(classifier, y)
+else:
+    cost = reconstructionCost(l2, x) + \
+           beta * sparsityCost(l1, spar) + \
+           Lambda * (weightCost(l1) + weightCost(l2))
+
 if model.hasClassifier:                 # Find the accuracy
     accuracy = model.accuracy(output,y) 
 
