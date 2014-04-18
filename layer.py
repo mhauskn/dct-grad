@@ -47,6 +47,12 @@ class Layer(object):
         self.W = theta[:self.inputSize*self.outputSize].reshape((self.inputSize, self.outputSize))
         self.b = theta[self.inputSize*self.outputSize:]
 
+    def getTheta(self):
+        if type(self.W) == np.ndarray:
+            return np.concatenate([self.W.flatten(),self.b])
+        else:
+            return np.concatenate([self.W.eval().flatten(),self.b.eval()])
+
     def forward(self, x):
         if not self.actFn:
             self.act = T.dot(x, self.W) + self.b
@@ -61,8 +67,9 @@ class Layer(object):
         return self.W
 
     def saveImage(self, fname):
+        z = self.W.T if type(self.W) == np.ndarray else self.W.eval().T
         image = PIL.Image.fromarray(tile_raster_images(
-                X=self.W.eval().T,
+                X=z,
                 img_shape=(28, 28), tile_shape=(14, 14),
                 tile_spacing=(1, 1)))
         image.save(fname)

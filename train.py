@@ -57,9 +57,9 @@ train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',datapa
 test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',datapath))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
-batch_size    = 10000                      # Size of minibatches
-nTrainBatches = max(1,nTrain/batch_size)
-nTestBatches  = max(1,nTest/batch_size)
+batch_size    = 1000                      # Size of minibatches
+nTrainBatches = 1#max(1,nTrain/batch_size)
+nTestBatches  = 1#max(1,nTest/batch_size)
 
 model = Model()
 if args.load:
@@ -78,17 +78,21 @@ if args.load:
 #     else: assert(False)
 #     model.addLayer(ae)
 
-l1 = Layer(visibleSize, hiddenSize)
-model.addLayer(l1)
-l2 = Layer(hiddenSize, visibleSize, activation=None)
-model.addLayer(l2)
+# l1 = Layer(visibleSize, hiddenSize)
+# model.addLayer(l1)
+# l2 = Layer(hiddenSize, visibleSize, activation=None)
+# model.addLayer(l2)
 
 # model.deleteLayer()
 
+l1 = model.layers[0]
+l2 = model.layers[1]
+
 if args.classify and not model.hasClassifier:
-    classifier = Softmax(hiddenSize,10)
+    classifier = Softmax(visibleSize,10)
     model.addLayer(classifier)
-model.freezeLayer(0)
+# model.freezeLayer(0)
+model.unfreezeLayer(0)
 model.finalize()
 
 index = T.lscalar()                     # Index into the batch of training examples

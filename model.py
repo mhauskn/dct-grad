@@ -29,16 +29,29 @@ class Model():
                              callable(getattr(self.layers[-1],'accuracy'))
 
     def freezeLayer(self, indx):
-        assert indx >= 0 and indx < len(self.layers)
-        self.frozen[indx] = True
+        assert indx >= 0 and indx < len(self.layers) and not self.frozen[indx]
         n = 0
         for i, l in enumerate(self.layers):
             p = self.params[i]
             if i == indx:
-                l.setTheta(self.theta[n:n+p])
                 t = self.theta.get_value()
+                l.freeze(t[n:n+p])
                 self.theta.set_value(np.concatenate([t[:n],t[n+p:]]).astype('float32'))
             n += p
+        self.frozen[indx] = True
+
+    def unfreezeLayer(self, indx):
+        assert indx >= 0 and indx < len(self.layers) and self.frozen[indx]
+        n = 0
+        for i, l in enumerate(self.layers):
+            p = self.params[i]
+            if i == indx:
+                t = self.theta.get_value()
+                layerParams = l.getTheta()
+                assert len(layerParams) == p
+                self.theta.set_value(np.concatenate([t[:n],layerParams,t[n:]]).astype('float32'))
+            n += p
+        self.frozen[indx] = False
 
     def finalize(self):
         n = 0
@@ -54,9 +67,10 @@ class Model():
     def setTheta(self, theta_value):
         self.theta.set_value(theta_value, borrow=True)
         n = 0
-        for l,p in zip(self.layers,self.params):
-            l.setTheta(self.theta[n:n+p])
-            n += p
+        for l,p,frozen in zip(self.layers,self.params,self.frozen):
+            if not frozen:
+                l.setTheta(self.theta[n:n+p])
+                n += p
 
     def getx0(self):
         return np.concatenate([l.getx0() for l in self.layers]).astype('float32')
@@ -88,5 +102,12 @@ class Model():
             l.saveImage(fname)
                     
     def __str__(self):
-        return '\n'.join(['Layer %d: '%(i) + l.__str__() for i, l in enumerate(self.layers)])
+        s = ''
+        for i, l in enumerate(self.layers):
+            if self.frozen[i]:
+                s += 'Layer %d [Frozen]: '%(i) + l.__str__() + '\n'
+            else:
+                s += 'Layer %d: '%(i) + l.__str__() + '\n'
+        s += 'Theta Size: %d'%len(self.theta.get_value())
+        return s
         
