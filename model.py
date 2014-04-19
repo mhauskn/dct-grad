@@ -81,12 +81,6 @@ class Model():
             a = l.forward(a)
         return a
 
-    # def cost(self, x, output, labels):
-    #     return self.costFn(x, output, labels)
-
-    def accuracy(self, output, labels):
-        return self.layers[-1].accuracy(output, labels)
-
     def save(self, fname='model.pkl'):
         pickle.dump(self.__dict__,open(fname,'wb'))
 

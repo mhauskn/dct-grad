@@ -26,6 +26,12 @@ def xentCost(layer, y):
     cost = -T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), y])
     return cost
 
+def accuracy(layer, y):
+    p_y_given_x = layer.getActivation()
+    y_pred = T.argmax(p_y_given_x, axis=1)
+    accuracy = T.mean(T.neq(y_pred, y))
+    return accuracy
+
 class Layer(object):
     def __init__(self, inputSize, outputSize, activation=T.nnet.sigmoid):
         self.inputSize     = inputSize
@@ -80,11 +86,6 @@ class Layer(object):
 class Softmax(Layer):
     def __init__(self, inputSize, nClasses):
         super(Softmax,self).__init__(inputSize, nClasses, T.nnet.softmax)
-
-    def accuracy(self, p_y_given_x, y):
-        y_pred = T.argmax(p_y_given_x, axis=1)
-        accuracy = T.mean(T.neq(y_pred, y))
-        return accuracy
 
     def __str__(self):
         return "Softmax Classifier. %d parameters"%self.nParams
