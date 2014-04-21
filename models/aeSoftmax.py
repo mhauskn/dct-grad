@@ -1,25 +1,36 @@
 # Trains a standard autoencoder followed by a softmax classifier
 model = Model()
+layerSizes = [visibleSize, 500, 250, 196]
 
-l1 = Layer(visibleSize, hiddenSize)
-model.addLayer(l1)
-l2 = Layer(hiddenSize, visibleSize, activation=None)
-model.addLayer(l2)
-model.finalize()
+for i in xrange(len(layerSizes)-1):
+    inputSz = layerSizes[i]
+    outputSz = layerSizes[i+1]
+    encode = Layer(inputSz, outputSz)
+    decode = Layer(outputSz, visibleSize, activation=None)
+    model.addLayer(encode)
+    model.addLayer(decode)
+    model.finalize()
 
-output = model.forward(x)
-cost = reconstructionCost(l2, x) + beta * sparsityCost(l1, spar) + Lambda * (weightCost(l1) + weightCost(l2))
-opttheta = train() 
-model.setTheta(opttheta)
+    output = model.forward(x)
+    cost = reconstructionCost(decode, x) + beta * sparsityCost(encode, spar) + Lambda * (weightCost(encode) + weightCost(decode))
+    opttheta = train()
+    model.setTheta(opttheta)
 
-classifier = Softmax(visibleSize,10)
+    model.deleteLayer() # Remove the top decoding layer
+    model.freezeLayer(i)
+
+# Unfreeze all the layers
+for i in xrange(len(layerSizes)-1):
+    model.unfreezeLayer(i)
+
+classifier = Softmax(model.getOutputSize(),10)
 model.addLayer(classifier)
 model.finalize()
         
 output = model.forward(x)
 cost = xentCost(classifier, y)
-accuracy = accuracy(classifier,y)
-opttheta = train()        
+accuracy = classifier.accuracy(y)
+opttheta = train()
 
 fname = path+'/results/'+outputPrefix
 model.saveImages(fname, opttheta)

@@ -8,14 +8,16 @@ class Model():
         self.layers = []
         self.params = []
         self.frozen = []
-        self.hasClassifier = False
         self.theta = theano.shared(value=np.zeros(0,dtype=theano.config.floatX), name='theta', borrow=True)
+
+    def hasClassifier(self):
+        l = self.layers[-1]
+        return hasattr(l,'accuracy') and callable(getattr(l,'accuracy'))
 
     def addLayer(self,layer):
         self.layers.append(layer)
         self.params.append(layer.getNParams())
         self.frozen.append(False)
-        self.hasClassifier = hasattr(layer,'accuracy') and callable(getattr(layer,'accuracy'))
         lx0 = layer.getx0()
         newtheta = np.concatenate([self.theta.get_value(), lx0]).astype('float32')
         self.theta.set_value(newtheta)
@@ -25,8 +27,6 @@ class Model():
         l = self.layers.pop()
         p = self.params.pop()
         self.theta.set_value(self.theta.get_value()[:-p])
-        self.hasClassifier = hasattr(self.layers[-1],'accuracy') and \
-                             callable(getattr(self.layers[-1],'accuracy'))
 
     def freezeLayer(self, indx):
         assert indx >= 0 and indx < len(self.layers) and not self.frozen[indx]
@@ -35,9 +35,14 @@ class Model():
             p = self.params[i]
             if i == indx:
                 t = self.theta.get_value()
-                l.freeze(t[n:n+p])
+                assert p == l.getNParams()
+                print n, p, len(t)
+                assert len(t) >= n+p
+                l.setTheta(t[n:n+p])
                 self.theta.set_value(np.concatenate([t[:n],t[n+p:]]).astype('float32'))
-            n += p
+                break
+            if not self.frozen[i]:
+                n += p
         self.frozen[indx] = True
 
     def unfreezeLayer(self, indx):
@@ -63,6 +68,9 @@ class Model():
 
     def getTheta(self):
         return self.theta
+
+    def getOutputSize(self):
+        return self.layers[-1].getOutputSize()
 
     def setTheta(self, theta_value):
         self.theta.set_value(theta_value, borrow=True)

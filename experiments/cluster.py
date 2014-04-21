@@ -79,8 +79,8 @@ class CondorJob(Job):
 class TaccJob(Job):
     def __init__(self, executable, args=''):
         Job.__init__(self, executable, args)
-        self.hours = 0
-        self.minutes = 30
+        self.hours = 12
+        self.minutes = 0
         self.dep = None
 
     def setJobTime(self, hours, minutes):

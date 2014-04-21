@@ -26,12 +26,6 @@ def xentCost(layer, y):
     cost = -T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), y])
     return cost
 
-def accuracy(layer, y):
-    p_y_given_x = layer.getActivation()
-    y_pred = T.argmax(p_y_given_x, axis=1)
-    accuracy = T.mean(T.neq(y_pred, y))
-    return accuracy
-
 class Layer(object):
     def __init__(self, inputSize, outputSize, activation=T.nnet.sigmoid):
         self.inputSize     = inputSize
@@ -41,8 +35,11 @@ class Layer(object):
         self.nBiasParams   = outputSize
         self.nParams       = self.nWeightParams + self.nBiasParams
 
-    def getNParams(self):
-        return self.nParams
+    def getInputSize  (self): return self.inputSize
+    def getOutputSize (self): return self.outputSize
+    def getNParams    (self): return self.nParams
+    def getActivation (self): return self.act
+    def getWeights    (self): return self.W
 
     def getx0(self):
         r = np.sqrt(6) / np.sqrt(self.inputSize+self.outputSize+1)
@@ -66,12 +63,6 @@ class Layer(object):
             self.act = self.actFn(T.dot(x, self.W) + self.b)
         return self.act
 
-    def getActivation(self):
-        return self.act
-
-    def getWeights(self):
-        return self.W
-
     def saveImage(self, fname):
         z = self.W.T if type(self.W) == np.ndarray else self.W.eval().T
         image = PIL.Image.fromarray(tile_raster_images(
@@ -81,11 +72,16 @@ class Layer(object):
         image.save(fname)
 
     def __str__(self):
-        return "Activation: %s. %d parameters"%(self.actFn,self.nParams)
+        shape = self.W.shape if type(self.W) == np.ndarray else self.W.eval().shape
+        return "%s Activation %s; %d parameters"%(shape,self.actFn,self.nParams)
     
 class Softmax(Layer):
     def __init__(self, inputSize, nClasses):
         super(Softmax,self).__init__(inputSize, nClasses, T.nnet.softmax)
 
-    def __str__(self):
-        return "Softmax Classifier. %d parameters"%self.nParams
+    def accuracy(self, y):
+        p_y_given_x = self.getActivation()
+        y_pred = T.argmax(p_y_given_x, axis=1)
+        accuracy = T.mean(T.neq(y_pred, y))
+        return accuracy
+

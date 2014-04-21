@@ -32,7 +32,6 @@ args = parser.parse_args()
 #=================== Parameters ===========================#
 inputShape    = (28, 28)             # Dimensionality of input 
 visibleSize   = 28*28                # Number of input units 
-hiddenSize    = 14*14                # Number of hidden units 
 sched         = args.model           # Training schedule file
 Lambda        = args.Lambda          # Weight decay term
 beta          = args.beta            # Weight of sparsity penalty term       
@@ -58,9 +57,9 @@ train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',datapa
 test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',datapath))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
-batch_size    = 1000                      # Size of minibatches
-nTrainBatches = 1#max(1,nTrain/batch_size)
-nTestBatches  = 1#max(1,nTest/batch_size)
+batch_size    = 10000                      # Size of minibatches
+nTrainBatches = max(1,nTrain/batch_size)
+nTestBatches  = max(1,nTest/batch_size)
 
 index = T.lscalar()                     # Index into the batch of training examples
 x = T.matrix('x')                       # Training data 
@@ -91,7 +90,7 @@ def train(nEpochs=trainEpochs):
                 y:train_set_y[index * batch_size: (index + 1) * batch_size]},
         on_unused_input='ignore', name="batch_grad")
 
-    if model.hasClassifier:
+    if model.hasClassifier():
         test_model = theano.function(
             inputs=[index],
             outputs=accuracy,
@@ -123,7 +122,7 @@ def train(nEpochs=trainEpochs):
         train_losses = [batch_cost(i) for i in xrange(nTrainBatches)]
         test_losses = [test_cost(i) for i in xrange(nTestBatches)]
         print('Epoch %d Train: %f Test: %f'%(epoch,np.mean(train_losses),np.mean(test_losses))),
-        if model.hasClassifier:
+        if model.hasClassifier():
             test_acc = [test_model(i) for i in xrange(nTestBatches)]
             print 'Accuracy: %.2f'%(100*(1-np.mean(test_acc)))
         else: print ''
@@ -144,6 +143,3 @@ def train(nEpochs=trainEpochs):
 
 # Run the training schedule 
 execfile(sched)
-# f = open(sched,'rb')
-# for line in f:
-#     exec(line)
