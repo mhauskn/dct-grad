@@ -36,7 +36,6 @@ class Model():
             if i == indx:
                 t = self.theta.get_value()
                 assert p == l.getNParams()
-                print n, p, len(t)
                 assert len(t) >= n+p
                 l.setTheta(t[n:n+p])
                 self.theta.set_value(np.concatenate([t[:n],t[n+p:]]).astype('float32'))
@@ -71,6 +70,9 @@ class Model():
 
     def getOutputSize(self):
         return self.layers[-1].getOutputSize()
+
+    def getWeights(self):
+        return [l.getWeights() for l in self.layers]
 
     def setTheta(self, theta_value):
         self.theta.set_value(theta_value, borrow=True)

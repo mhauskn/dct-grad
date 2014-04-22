@@ -9,10 +9,9 @@ import mnist
 import scipy.optimize
 import argparse
 from itertools import *
-# from autoencoder import *
-# from softmax import *
 from model import *
 from layer import *
+from utils import *
 
 parser = argparse.ArgumentParser(description='Testing dct transforms')
 parser.add_argument('--model', required=True, type=str, help='Model training schedule')
