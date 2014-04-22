@@ -52,8 +52,8 @@ def shared_dataset(data_xy, borrow=True):
     return shared_x, T.cast(shared_y, 'int32')
 
 datapath = path + '/data/'
-train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',datapath))
-test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',datapath))
+train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',datapath, dataDCT))
+test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',datapath, dataDCT))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = 10000                      # Size of minibatches

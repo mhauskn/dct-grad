@@ -1,6 +1,7 @@
 import os, struct
 import dct
 from array import array as pyarray
+import numpy
 from numpy import append, array, int8, uint8, zeros
 
 def read(digits, dataset = "training", path = ".", applyDCT = False):
@@ -47,7 +48,7 @@ def read(digits, dataset = "training", path = ".", applyDCT = False):
     if applyDCT:
         imgDCT = dct.dct((28,28))
         for i in range(len(images)):
-            images[i,:] = imgDCT.dct2(images[i,:].reshape(28,28)).flatten()
-            # Consider: Normalizing Contrast
-        
+            a = imgDCT.dct2(images[i,:].reshape(28,28)).flatten()
+            images[i,:] = (a - min(a)) / (max(a) - min(a))
+
     return images, labels
