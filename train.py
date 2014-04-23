@@ -16,6 +16,7 @@ from utils import *
 parser = argparse.ArgumentParser(description='Testing dct transforms')
 parser.add_argument('--model', required=True, type=str, help='Model training schedule')
 parser.add_argument('--autoencoder', required=False, type=str, default='autoencoder')
+parser.add_argument('--activation', required=False, type=str, default='sigmoid')
 parser.add_argument('--compression', required=False, type=float, default=.5)
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
@@ -42,6 +43,16 @@ trainEpochs   = args.nEpochs         # How many epochs to train
 dataDCT       = args.dataDCT         # Performs DCT transform on the dataset
 aeType        = args.autoencoder     # What type of autoencoder
 nStripes      = 9                    # Number of stripes for the stripeAE
+
+if args.activation == 'sigmoid':
+    actFn = T.nnet.sigmoid
+elif args.activation == 'tanh':
+    actFn = T.tanh
+elif args.activation == 'relu':
+    actFn = T.nnet.softplus
+elif args.activation == 'linear':
+    actFn = None
+else: assert False, 'Unrecognized Activation Function!'
 
 #================== Load the dataset ==========================#
 def shared_dataset(data_xy, borrow=True):
