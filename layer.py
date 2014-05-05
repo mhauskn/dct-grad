@@ -65,9 +65,11 @@ class Layer(object):
 
     def saveImage(self, fname):
         z = self.W.T if type(self.W) == np.ndarray else self.W.eval().T
+        a = int(np.sqrt(self.inputSize))
+        b = int(np.sqrt(self.outputSize))
         image = PIL.Image.fromarray(tile_raster_images(
                 X=z,
-                img_shape=(28, 28), tile_shape=(14, 14),
+                img_shape=(a, a), tile_shape=(b, b),
                 tile_spacing=(1, 1)))
         image.save(fname)
 

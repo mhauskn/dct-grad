@@ -46,9 +46,11 @@ def read(digits, dataset = "training", path = ".", applyDCT = False):
 
     # Apply a 2-D DCT transform to the image if desired
     if applyDCT:
+        dct_images = zeros((N, 100), dtype='float32')
         imgDCT = dct.dct((28,28))
         for i in range(len(images)):
-            a = imgDCT.dct2(images[i,:].reshape(28,28)).flatten()
-            images[i,:] = (a - min(a)) / (max(a) - min(a))
+            a = imgDCT.dct2(images[i,:].reshape(28,28))[:10,:10].flatten()
+            dct_images[i,:] = a #(a - min(a)) / (max(a) - min(a))
+        return dct_images, labels
 
     return images, labels
