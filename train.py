@@ -22,6 +22,7 @@ parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
 parser.add_argument('--dataDCT', action='store_true', default=False)
+parser.add_argument('--dataPCA', action='store_true', default=False)
 parser.add_argument('--beta', required=False, type=float, default=3)
 parser.add_argument('--spar', required=False, type=float, default=.1)
 parser.add_argument('--Lambda', required=False, type=float, default=3e-3)
@@ -41,6 +42,7 @@ path          = args.path            # Directory to load/save files
 outputPrefix  = args.outputPrefix    # Prefix for output file names
 trainEpochs   = args.nEpochs         # How many epochs to train
 dataDCT       = args.dataDCT         # Performs DCT transform on the dataset
+dataPCA       = args.dataPCA         # Performs PCA transform on the dataset
 aeType        = args.autoencoder     # What type of autoencoder
 nStripes      = 9                    # Number of stripes for the stripeAE
 
@@ -63,8 +65,20 @@ def shared_dataset(data_xy, borrow=True):
     return shared_x, T.cast(shared_y, 'int32')
 
 datapath = path + '/data/'
-train_set_x, train_set_y = shared_dataset(mnist.read(range(10),'training',datapath, dataDCT))
-test_set_x, test_set_y = shared_dataset(mnist.read(range(10),'testing',datapath, dataDCT))
+a,b = mnist.read(range(10), 'training', datapath)
+c,d = mnist.read(range(10), 'testing', datapath)
+
+if dataPCA:
+    print 'Applying PCA transform to dataset'
+    a = mnist.applyPCA(a)
+    c = mnist.applyPCA(c)
+if dataDCT:
+    print 'Applying DCT transform to dataset'
+    a = mnist.applyDCT(a)
+    c = mnist.applyDCT(c)
+
+train_set_x, train_set_y = shared_dataset((a,b))
+test_set_x, test_set_y = shared_dataset((c,d))
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = 10000                      # Size of minibatches
