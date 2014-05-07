@@ -1,6 +1,5 @@
 # Trains a standard autoencoder followed by a softmax classifier
 model = Model()
-visibleSize = 10*10
 inputSz = visibleSize
 outputSz = 196
 encode = Layer(inputSz, outputSz, activation=actFn)

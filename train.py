@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description='Testing dct transforms')
 parser.add_argument('--model', required=True, type=str, help='Model training schedule')
 parser.add_argument('--autoencoder', required=False, type=str, default='autoencoder')
 parser.add_argument('--activation', required=False, type=str, default='sigmoid')
-parser.add_argument('--compression', required=False, type=float, default=.5)
+parser.add_argument('--nCoeffs', required=False, type=int, default=784)
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
@@ -37,7 +37,7 @@ sched         = args.model           # Training schedule file
 Lambda        = args.Lambda          # Weight decay term
 beta          = args.beta            # Weight of sparsity penalty term       
 spar          = args.spar            # Sparsity parameter
-compression   = args.compression     # Percentage compression
+nCoeffs       = args.nCoeffs         # Percentage compression
 path          = args.path            # Directory to load/save files
 outputPrefix  = args.outputPrefix    # Prefix for output file names
 trainEpochs   = args.nEpochs         # How many epochs to train
@@ -69,16 +69,17 @@ a,b = mnist.read(range(10), 'training', datapath)
 c,d = mnist.read(range(10), 'testing', datapath)
 
 if dataPCA:
-    print 'Applying PCA transform to dataset'
-    a = mnist.applyPCA(a)
-    c = mnist.applyPCA(c)
+    print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
+    a = mnist.applyPCA(a, nCoeffs)
+    c = mnist.applyPCA(c, nCoeffs)
 if dataDCT:
-    print 'Applying DCT transform to dataset'
-    a = mnist.applyDCT(a)
-    c = mnist.applyDCT(c)
+    print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
+    a = mnist.applyDCT(a, nCoeffs)
+    c = mnist.applyDCT(c, nCoeffs)
 
 train_set_x, train_set_y = shared_dataset((a,b))
 test_set_x, test_set_y = shared_dataset((c,d))
+visibleSize   = train_set_x.shape[1].eval() # Dimension of each training example
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
 batch_size    = 10000                      # Size of minibatches

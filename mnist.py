@@ -48,10 +48,11 @@ def read(digits, dataset = "training", path = "."):
 
 def applyDCT(images, nCoeffs=100):
     ''' Apply a 2-D DCT transform to the images '''
+    edge = int(np.sqrt(nCoeffs))
     dct_images = zeros((len(images), nCoeffs), dtype='float32')
     imgDCT = dct.dct((28,28))
     for i in range(len(images)):
-        a = imgDCT.dct2(images[i,:].reshape(28,28))[:10,:10].flatten()
+        a = imgDCT.dct2(images[i,:].reshape(28,28))[:edge,:edge].flatten()
         dct_images[i,:] = a #(a - min(a)) / (max(a) - min(a))
     return dct_images
 
