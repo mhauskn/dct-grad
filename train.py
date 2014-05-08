@@ -31,8 +31,6 @@ parser.add_argument('--load', required=False, type=str)
 args = parser.parse_args()
 
 #=================== Parameters ===========================#
-inputShape    = (28, 28)             # Dimensionality of input 
-visibleSize   = 28*28                # Number of input units 
 sched         = args.model           # Training schedule file
 Lambda        = args.Lambda          # Weight decay term
 beta          = args.beta            # Weight of sparsity penalty term       
@@ -59,30 +57,59 @@ else: assert False, 'Unrecognized Activation Function!'
 #================== Load the dataset ==========================#
 def shared_dataset(data_xy, borrow=True):
     data_x, data_y = data_xy
-    data_y = np.fromiter(chain.from_iterable(data_y), dtype='int')
+    #data_y = np.fromiter(chain.from_iterable(data_y), dtype='int')
     shared_x = theano.shared(np.asarray(data_x,dtype=theano.config.floatX),borrow=borrow)
     shared_y = theano.shared(np.asarray(data_y,dtype=theano.config.floatX),borrow=borrow)
     return shared_x, T.cast(shared_y, 'int32')
 
 datapath = path + '/data/'
-a,b = mnist.read(range(10), 'training', datapath)
-c,d = mnist.read(range(10), 'testing', datapath)
+datapath = path + '/data/'
+import cPickle
+for i in range(1,6):
+    fname = datapath+'cifar-10-batches-py/'+'data_batch_%s'%i
+    dict = cPickle.load(open(fname,'r'))
+    if i == 1:
+        data = dict['data']
+        labels = dict['labels']
+    else:
+        data = np.concatenate((data,dict['data']))
+        labels = np.concatenate((labels,dict['labels']))
+data = data / 255.
 
-if dataPCA:
-    print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
-    a = mnist.applyPCA(a, nCoeffs)
-    c = mnist.applyPCA(c, nCoeffs)
-if dataDCT:
-    print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
-    a = mnist.applyDCT(a, nCoeffs)
-    c = mnist.applyDCT(c, nCoeffs)
+# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_1','r'))
+# train_set_1_x, train_set_1_y = shared_dataset((a['data']/255., a['labels']))
+# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_2','r'))
+# train_set_2_x, train_set_2_y = shared_dataset((a['data']/255., a['labels']))
+# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_3','r'))
+# train_set_3_x, train_set_3_y = shared_dataset((a['data']/255., a['labels']))
+# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_4','r'))
+# train_set_4_x, train_set_4_y = shared_dataset((a['data']/255., a['labels']))
+# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_5','r'))
+# train_set_5_x, train_set_5_y = shared_dataset((a['data']/255., a['labels']))
 
-train_set_x, train_set_y = shared_dataset((a,b))
-test_set_x, test_set_y = shared_dataset((c,d))
+# TODO: Convert to YCrCb Format
+
+train_set_x, train_set_y = shared_dataset((data,labels))
+test_dict = cPickle.load(open(datapath+'cifar-10-batches-py/'+'test_batch','r'))
+test_set_x, test_set_y = shared_dataset((test_dict['data'], test_dict['labels']))
+
+# a,b = mnist.read(range(10), 'training', datapath)
+# c,d = mnist.read(range(10), 'testing', datapath)
+# if dataPCA:
+#     print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
+#     a = mnist.applyPCA(a, nCoeffs)
+#     c = mnist.applyPCA(c, nCoeffs)
+# if dataDCT:
+#     print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
+#     a = mnist.applyDCT(a, nCoeffs)
+#     c = mnist.applyDCT(c, nCoeffs)
+# train_set_x, train_set_y = shared_dataset((a,b))
+# test_set_x, test_set_y = shared_dataset((c,d))
+
 visibleSize   = train_set_x.shape[1].eval() # Dimension of each training example
 nTrain        = train_set_x.shape[0].eval() # Number training samples
 nTest         = test_set_x.shape[0].eval()  # Number of test samples
-batch_size    = 10000                      # Size of minibatches
+batch_size    = 10000                       # Size of minibatches
 nTrainBatches = max(1,nTrain/batch_size)
 nTestBatches  = max(1,nTest/batch_size)
 

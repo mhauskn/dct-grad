@@ -13,8 +13,8 @@ cost = reconstructionCost(decode, x) + beta * sparsityCost(encode, spar) + Lambd
 opttheta = train()
 model.setTheta(opttheta)
 
-fname = path+'/results/pre'+outputPrefix
-model.saveImages(fname, opttheta)
+# fname = path+'/results/pre'+outputPrefix
+# model.saveImages(fname, opttheta)
 
 classifier = Softmax(model.getOutputSize(),10)
 model.addLayer(classifier)
@@ -25,8 +25,8 @@ cost = xentCost(classifier, y)
 accuracy = classifier.accuracy(y)
 opttheta = train(10000)
 
-fname = path+'/results/post'+outputPrefix
-model.saveImages(fname, opttheta)
+# fname = path+'/results/post'+outputPrefix
+# model.saveImages(fname, opttheta)
 
 if args.save:
     model.save(args.save)
