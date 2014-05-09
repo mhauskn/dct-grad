@@ -3,6 +3,7 @@ import dct
 from array import array as pyarray
 import numpy as np
 from numpy import append, array, int8, uint8, zeros
+from itertools import *
 
 def read(digits, dataset = "training", path = "."):
     """
@@ -44,12 +45,14 @@ def read(digits, dataset = "training", path = "."):
     for i in range(len(images)):  # Convert them back over to row-major
         images[i,:] = images[i,:].reshape(28,28).T.flatten()
 
+    labels = np.fromiter(chain.from_iterable(labels), dtype='int')
+
     return images, labels
 
 def applyDCT(images, nCoeffs=100):
     ''' Apply a 2-D DCT transform to the images '''
     edge = int(np.sqrt(nCoeffs))
-    dct_images = zeros((len(images), nCoeffs), dtype='float32')
+    dct_images = zeros((len(images), nCoeffs), dtype=theano.config.floatX)
     imgDCT = dct.dct((28,28))
     for i in range(len(images)):
         a = imgDCT.dct2(images[i,:].reshape(28,28))[:edge,:edge].flatten()

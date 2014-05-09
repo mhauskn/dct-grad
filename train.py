@@ -8,7 +8,6 @@ import matplotlib.cm as cm
 import mnist
 import scipy.optimize
 import argparse
-from itertools import *
 from model import *
 from layer import *
 from utils import *
@@ -18,6 +17,7 @@ parser.add_argument('--model', required=True, type=str, help='Model training sch
 parser.add_argument('--autoencoder', required=False, type=str, default='autoencoder')
 parser.add_argument('--activation', required=False, type=str, default='sigmoid')
 parser.add_argument('--nCoeffs', required=False, type=int, default=784)
+parser.add_argument('--nHidden', required=False, type=int, default=196)
 parser.add_argument('--nEpochs', required=False, type=int, default=200)
 parser.add_argument('--outputPrefix', required=False, type=str, default='out')
 parser.add_argument('--path', required=False, default='.')
@@ -32,6 +32,7 @@ args = parser.parse_args()
 
 #=================== Parameters ===========================#
 sched         = args.model           # Training schedule file
+nHidden       = args.nHidden         # Number of hidden units
 Lambda        = args.Lambda          # Weight decay term
 beta          = args.beta            # Weight of sparsity penalty term       
 spar          = args.spar            # Sparsity parameter
@@ -55,43 +56,62 @@ elif args.activation == 'linear':
 else: assert False, 'Unrecognized Activation Function!'
 
 #================== Load the dataset ==========================#
-def shared_dataset(data_xy, borrow=True):
-    data_x, data_y = data_xy
-    #data_y = np.fromiter(chain.from_iterable(data_y), dtype='int')
+def shared_dataset(data_x, data_y, borrow=True):
     shared_x = theano.shared(np.asarray(data_x,dtype=theano.config.floatX),borrow=borrow)
     shared_y = theano.shared(np.asarray(data_y,dtype=theano.config.floatX),borrow=borrow)
     return shared_x, T.cast(shared_y, 'int32')
 
-datapath = path + '/data/'
 datapath = path + '/data/'
 import cPickle
 for i in range(1,6):
     fname = datapath+'cifar-10-batches-py/'+'data_batch_%s'%i
     dict = cPickle.load(open(fname,'r'))
     if i == 1:
-        data = dict['data']
-        labels = dict['labels']
+        train_data = dict['data']
+        train_labels = dict['labels']
     else:
-        data = np.concatenate((data,dict['data']))
-        labels = np.concatenate((labels,dict['labels']))
-data = data / 255.
+        train_data = np.concatenate((train_data,dict['data']))
+        train_labels = np.concatenate((train_labels,dict['labels']))
+train_data = train_data / 255.
+test_dict = cPickle.load(open(datapath+'cifar-10-batches-py/test_batch','r'))
+test_data, test_labels = test_dict['data'], test_dict['labels']
+# TODO: Convert to YCrCb Format?
 
-# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_1','r'))
-# train_set_1_x, train_set_1_y = shared_dataset((a['data']/255., a['labels']))
-# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_2','r'))
-# train_set_2_x, train_set_2_y = shared_dataset((a['data']/255., a['labels']))
-# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_3','r'))
-# train_set_3_x, train_set_3_y = shared_dataset((a['data']/255., a['labels']))
-# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_4','r'))
-# train_set_4_x, train_set_4_y = shared_dataset((a['data']/255., a['labels']))
-# a = cPickle.load(open(datapath+'cifar-10-batches-py/data_batch_5','r'))
-# train_set_5_x, train_set_5_y = shared_dataset((a['data']/255., a['labels']))
+def applyDataDCT(data, nCoeffs=100):
+    edge = int(np.sqrt(nCoeffs))
+    dct_images = np.zeros((len(data), 3*edge*edge), dtype=theano.config.floatX)
+    imgDCT = dct.dct((32,32))
+    for i in range(len(data)):
+        r = imgDCT.dct2(data[i,:1024].reshape(32,32))[:edge,:edge].flatten()
+        g = imgDCT.dct2(data[i,1024:2048].reshape(32,32))[:edge,:edge].flatten()
+        b = imgDCT.dct2(data[i,2048:].reshape(32,32))[:edge,:edge].flatten()    
+        dct_images[i,:] = np.concatenate((r,g,b)) 
+    return dct_images
 
-# TODO: Convert to YCrCb Format
+def applyDataPCA(data, nCoeffs=100):
+    # data = (data.T - data.mean(1)).T # Zero-mean the data
+    # a = np.dot(data.T, data) / len(data)
+    # vals, vecs = np.linalg.eigh(a)
+    vals, vecs = cPickle.load(open('vv.pkl','r'))
+    vals = vals[::-1]
+    vecs = vecs[:, ::-1]
+    vals = np.sqrt(vals[:nCoeffs])
+    vecs = vecs[:, :nCoeffs]
+    def whiten(x):
+        return np.dot(x, np.dot(vecs, np.diag(1. / vals)))
+    return whiten(data)
 
-train_set_x, train_set_y = shared_dataset((data,labels))
-test_dict = cPickle.load(open(datapath+'cifar-10-batches-py/'+'test_batch','r'))
-test_set_x, test_set_y = shared_dataset((test_dict['data'], test_dict['labels']))
+if dataDCT:
+    print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
+    train_data = applyDataDCT(train_data, nCoeffs)
+    test_data = applyDataDCT(test_data, nCoeffs)
+elif dataPCA:
+    print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
+    train_data = applyDataPCA(train_data, nCoeffs)
+    test_data = applyDataPCA(test_data, nCoeffs)
+
+train_set_x, train_set_y = shared_dataset(train_data, train_labels)
+test_set_x, test_set_y = shared_dataset(test_data, test_labels)
 
 # a,b = mnist.read(range(10), 'training', datapath)
 # c,d = mnist.read(range(10), 'testing', datapath)

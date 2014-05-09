@@ -71,6 +71,9 @@ class Model():
     def getOutputSize(self):
         return self.layers[-1].getOutputSize()
 
+    def getOutputShape(self):
+        return self.layers[-1].getOutputShape()
+
     def getWeights(self):
         return [l.getWeights() for l in self.layers]
 
@@ -111,7 +114,8 @@ class Model():
             if self.frozen[i]:
                 s += 'Layer %d [Frozen]: '%(i) + l.__str__() + '\n'
             else:
-                s += 'Layer %d: '%(i) + l.__str__() + '\n'
+                s += 'Layer %d: %s-->%s '%(i,l.getInputShape(),l.getOutputShape()) \
+                    + l.__str__() + '\n'
         s += 'Theta Size: %d'%len(self.theta.get_value())
         return s
         

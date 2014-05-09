@@ -1,29 +1,29 @@
 # Trains a standard autoencoder followed by a softmax classifier
 model = Model()
 inputSz = visibleSize
-outputSz = 196
+outputSz = nHidden
 encode = Layer(inputSz, outputSz, activation=actFn)
 decode = Layer(outputSz, visibleSize, activation=actFn)
 model.addLayer(encode)
 model.addLayer(decode)
-model.finalize()
+# model.finalize()
 
-output = model.forward(x)
-cost = reconstructionCost(decode, x) + beta * sparsityCost(encode, spar) + Lambda * (weightCost(encode) + weightCost(decode))
-opttheta = train()
-model.setTheta(opttheta)
+# output = model.forward(x)
+# cost = reconstructionCost(decode, x) + beta * sparsityCost(encode, spar) + Lambda * (weightCost(encode) + weightCost(decode))
+# opttheta = train(200)
+# model.setTheta(opttheta)
 
 # fname = path+'/results/pre'+outputPrefix
 # model.saveImages(fname, opttheta)
 
-classifier = Softmax(model.getOutputSize(),10)
+classifier = Softmax(model.getOutputShape(),10)
 model.addLayer(classifier)
 model.finalize()
         
 output = model.forward(x)
 cost = xentCost(classifier, y)
 accuracy = classifier.accuracy(y)
-opttheta = train(10000)
+opttheta = train(800)
 
 # fname = path+'/results/post'+outputPrefix
 # model.saveImages(fname, opttheta)
