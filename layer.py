@@ -8,6 +8,8 @@ from utils import tile_raster_images
 
 rng = np.random
 
+### Cost Functions
+
 def sparsityCost(layer, spar=.1):
     # Col-Mean: AvgAct of each hidden unit across all m-examples
     avgAct = layer.getActivation().mean(axis=0) 
@@ -23,7 +25,8 @@ def weightCost(layer):
 
 def xentCost(layer, y):
     p_y_given_x = layer.getActivation()
-    cost = -T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), y])
+    cost = T.mean(T.nnet.categorical_crossentropy(p_y_given_x, y))
+    #cost = -T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), y])
     return cost
 
 class Layer(object):

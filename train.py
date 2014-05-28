@@ -1,13 +1,13 @@
 import sys
 import time
 import numpy as np
+import shownet
 import theano
 import theano.tensor as T
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import mnist
 import scipy.optimize
 import argparse
+
 from model import *
 from layer import *
 from utils import *
@@ -50,7 +50,8 @@ if args.activation == 'sigmoid':
 elif args.activation == 'tanh':
     actFn = T.tanh
 elif args.activation == 'relu':
-    actFn = T.nnet.softplus
+    # actFn = lambda x: x * (x > 0)
+   actFn = T.nnet.softplus
 elif args.activation == 'linear':
     actFn = None
 else: assert False, 'Unrecognized Activation Function!'
@@ -62,69 +63,69 @@ def shared_dataset(data_x, data_y, borrow=True):
     return shared_x, T.cast(shared_y, 'int32')
 
 datapath = path + '/data/'
-import cPickle
-for i in range(1,6):
-    fname = datapath+'cifar-10-batches-py/'+'data_batch_%s'%i
-    dict = cPickle.load(open(fname,'r'))
-    if i == 1:
-        train_data = dict['data']
-        train_labels = dict['labels']
-    else:
-        train_data = np.concatenate((train_data,dict['data']))
-        train_labels = np.concatenate((train_labels,dict['labels']))
-train_data = train_data / 255.
-test_dict = cPickle.load(open(datapath+'cifar-10-batches-py/test_batch','r'))
-test_data, test_labels = test_dict['data'], test_dict['labels']
-# TODO: Convert to YCrCb Format?
+# import cPickle
+# for i in range(1,6):
+#     fname = datapath+'cifar-10-batches-py/'+'data_batch_%s'%i
+#     dict = cPickle.load(open(fname,'r'))
+#     if i == 1:
+#         train_data = dict['data']
+#         train_labels = dict['labels']
+#     else:
+#         train_data = np.concatenate((train_data,dict['data']))
+#         train_labels = np.concatenate((train_labels,dict['labels']))
+# train_data = train_data / 255.
+# test_dict = cPickle.load(open(datapath+'cifar-10-batches-py/test_batch','r'))
+# test_data, test_labels = test_dict['data'], test_dict['labels']
+# # TODO: Convert to YCrCb Format?
 
-def applyDataDCT(data, nCoeffs=100):
-    edge = int(np.sqrt(nCoeffs))
-    dct_images = np.zeros((len(data), 3*edge*edge), dtype=theano.config.floatX)
-    imgDCT = dct.dct((32,32))
-    for i in range(len(data)):
-        r = imgDCT.dct2(data[i,:1024].reshape(32,32))[:edge,:edge].flatten()
-        g = imgDCT.dct2(data[i,1024:2048].reshape(32,32))[:edge,:edge].flatten()
-        b = imgDCT.dct2(data[i,2048:].reshape(32,32))[:edge,:edge].flatten()    
-        dct_images[i,:] = np.concatenate((r,g,b)) 
-    return dct_images
+# def applyDataDCT(data, nCoeffs=100):
+#     edge = int(np.sqrt(nCoeffs))
+#     dct_images = np.zeros((len(data), 3*edge*edge), dtype=theano.config.floatX)
+#     imgDCT = dct.dct((32,32))
+#     for i in range(len(data)):
+#         r = imgDCT.dct2(data[i,:1024].reshape(32,32))[:edge,:edge].flatten()
+#         g = imgDCT.dct2(data[i,1024:2048].reshape(32,32))[:edge,:edge].flatten()
+#         b = imgDCT.dct2(data[i,2048:].reshape(32,32))[:edge,:edge].flatten()    
+#         dct_images[i,:] = np.concatenate((r,g,b)) 
+#     return dct_images
 
-def applyDataPCA(data, nCoeffs=100):
-    # data = (data.T - data.mean(1)).T # Zero-mean the data
-    # a = np.dot(data.T, data) / len(data)
-    # vals, vecs = np.linalg.eigh(a)
-    vals, vecs = cPickle.load(open('vv.pkl','r'))
-    vals = vals[::-1]
-    vecs = vecs[:, ::-1]
-    vals = np.sqrt(vals[:nCoeffs])
-    vecs = vecs[:, :nCoeffs]
-    def whiten(x):
-        return np.dot(x, np.dot(vecs, np.diag(1. / vals)))
-    return whiten(data)
+# def applyDataPCA(data, nCoeffs=100):
+#     # data = (data.T - data.mean(1)).T # Zero-mean the data
+#     # a = np.dot(data.T, data) / len(data)
+#     # vals, vecs = np.linalg.eigh(a)
+#     vals, vecs = cPickle.load(open('vv.pkl','r'))
+#     vals = vals[::-1]
+#     vecs = vecs[:, ::-1]
+#     vals = np.sqrt(vals[:nCoeffs])
+#     vecs = vecs[:, :nCoeffs]
+#     def whiten(x):
+#         return np.dot(x, np.dot(vecs, np.diag(1. / vals)))
+#     return whiten(data)
 
-if dataDCT:
-    print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
-    train_data = applyDataDCT(train_data, nCoeffs)
-    test_data = applyDataDCT(test_data, nCoeffs)
-elif dataPCA:
-    print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
-    train_data = applyDataPCA(train_data, nCoeffs)
-    test_data = applyDataPCA(test_data, nCoeffs)
-
-train_set_x, train_set_y = shared_dataset(train_data, train_labels)
-test_set_x, test_set_y = shared_dataset(test_data, test_labels)
-
-# a,b = mnist.read(range(10), 'training', datapath)
-# c,d = mnist.read(range(10), 'testing', datapath)
-# if dataPCA:
-#     print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
-#     a = mnist.applyPCA(a, nCoeffs)
-#     c = mnist.applyPCA(c, nCoeffs)
 # if dataDCT:
 #     print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
-#     a = mnist.applyDCT(a, nCoeffs)
-#     c = mnist.applyDCT(c, nCoeffs)
-# train_set_x, train_set_y = shared_dataset((a,b))
-# test_set_x, test_set_y = shared_dataset((c,d))
+#     train_data = applyDataDCT(train_data, nCoeffs)
+#     test_data = applyDataDCT(test_data, nCoeffs)
+# elif dataPCA:
+#     print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
+#     train_data = applyDataPCA(train_data, nCoeffs)
+#     test_data = applyDataPCA(test_data, nCoeffs)
+
+# train_set_x, train_set_y = shared_dataset(train_data, train_labels)
+# test_set_x, test_set_y = shared_dataset(test_data, test_labels)
+
+a,b = mnist.read(range(10), 'training', datapath)
+c,d = mnist.read(range(10), 'testing', datapath)
+if dataPCA:
+    print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
+    a = mnist.applyPCA(a, nCoeffs)
+    c = mnist.applyPCA(c, nCoeffs)
+if dataDCT:
+    print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
+    a = mnist.applyDCT(a, nCoeffs)
+    c = mnist.applyDCT(c, nCoeffs)
+train_set_x, train_set_y = shared_dataset(a,b)
+test_set_x, test_set_y = shared_dataset(c,d)
 
 visibleSize   = train_set_x.shape[1].eval() # Dimension of each training example
 nTrain        = train_set_x.shape[0].eval() # Number training samples
@@ -138,6 +139,7 @@ x = T.matrix('x')                       # Training data
 y = T.ivector('y')                      # Vector of labels
 
 epoch = 0
+train_costs, test_costs, test_acc = [],[],[]
 
 def train(nEpochs=trainEpochs):
     #================== Theano Functions ==========================#
@@ -190,15 +192,25 @@ def train(nEpochs=trainEpochs):
 
     def callbackFn(theta_value):
         global epoch
+        global train_costs
+        global test_costs
+        global test_acc
+
         model.setTheta(theta_value)
         train_losses = [batch_cost(i) for i in xrange(nTrainBatches)]
         test_losses = [test_cost(i) for i in xrange(nTestBatches)]
+        train_costs.append(np.mean(train_losses))
+        test_costs.append(np.mean(test_losses))
         print('Epoch %d Train: %f Test: %f'%(epoch,np.mean(train_losses),np.mean(test_losses))),
         if model.hasClassifier():
-            test_acc = [test_model(i) for i in xrange(nTestBatches)]
-            print 'Accuracy: %.2f'%(100*(1-np.mean(test_acc)))
+            test_err = 100 * np.mean([test_model(i) for i in xrange(nTestBatches)])
+            test_acc.append(test_err)
+            print 'Error: %.2f'%test_err
         else: print ''
         sys.stdout.flush()
+        # if epoch % 10 == 0:
+        #     shownet.plotCost('results/train.png', train_costs, test_costs, test_acc)
+        #     showWeights()
         epoch += 1
 
     #================== Optimize ==========================#
