@@ -1,9 +1,37 @@
 # Trains a visualization layer
 model = Model()
 
+def showPart1():
+    W0 = model.layers[0].W.eval() # 784x196
+    b0 = model.layers[0].b.eval() # 196
+    a0 = W0
+    W1 = model.layers[1].W.eval() # 196x10
+    b1 = model.layers[1].b.eval() # 10
+    a1 = W1
+
+    W0_v = a0
+    W1_v = np.dot(a1.T, W0_v.T).T
+    
+    shownet.make_filter_fig(fname='results/l0.png',
+                            filters = W0_v,
+                            _title='Layer 0 Weights')
+    shownet.make_filter_fig(fname='results/l1.png',
+                            filters = W1_v,
+                            _title='Layer 1 Weights')
+    
+def showPart2():
+    W2 = model.layers[2].W.eval() # 10x784
+    b2 = model.layers[2].b.eval() # 784
+    a2 = W2 + b2
+
+    W2_v = a2.T
+    
+    shownet.make_filter_fig(fname='results/l2.png',
+                            filters = W2_v,
+                            _title='Layer 2 Weights')
+
 if args.load:
     model.load(args.load)
-    model.freezeLayer(2)
 
     W0 = model.layers[0].W # 784x196
     b0 = model.layers[0].b # 196
@@ -15,7 +43,7 @@ if args.load:
     b2 = model.layers[2].b # 784
     a2 = W2 + b2
 
-    W0_v = a0 
+    W0_v = a0
     W1_v = np.dot(a1.T, W0_v.T).T
     W2_v = a2.T
     
@@ -28,8 +56,7 @@ if args.load:
     shownet.make_filter_fig(fname='results/l2.png',
                             filters = W2_v,
                             _title='Layer 2 Weights')
-    exit()
-    
+
 else:
     inputSz = visibleSize
     outputSz = nHidden
@@ -39,10 +66,12 @@ else:
     model.addLayer(classifier)
     model.finalize()
         
+    plotProgress = showPart1
+
     output = model.forward(x)
     cost = xentCost(classifier, y)
     accuracy = classifier.accuracy(y)
-    opttheta = train(200)
+    opttheta = train(100)
     model.setTheta(opttheta)
 
     # Add decoding/visualization layer
@@ -54,14 +83,17 @@ else:
     model.freezeLayer(1)
     model.finalize()
 
+    plotProgress = showPart2
+
     # Train the decoding layer to reconstruct
     output = model.forward(x)
     cost = reconstructionCost(decode, x)
-    opttheta = train(50)
+    opttheta = train(10)
 
-    model.unfreezeLayer(0)
-    model.unfreezeLayer(1)
-    model.setTheta(opttheta)
+    # model.unfreezeLayer(0)
+    # model.unfreezeLayer(1)
+    # model.setTheta(opttheta)
+    model.freezeLayer(2)
     model.save('results/vis.mdl')
 
 

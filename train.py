@@ -1,3 +1,5 @@
+import cPickle
+import gzip
 import sys
 import time
 import numpy as np
@@ -7,6 +9,7 @@ import theano.tensor as T
 import mnist
 import scipy.optimize
 import argparse
+import os.path
 
 from model import *
 from layer import *
@@ -63,7 +66,6 @@ def shared_dataset(data_x, data_y, borrow=True):
     return shared_x, T.cast(shared_y, 'int32')
 
 datapath = path + '/data/'
-# import cPickle
 # for i in range(1,6):
 #     fname = datapath+'cifar-10-batches-py/'+'data_batch_%s'%i
 #     dict = cPickle.load(open(fname,'r'))
@@ -114,18 +116,12 @@ datapath = path + '/data/'
 # train_set_x, train_set_y = shared_dataset(train_data, train_labels)
 # test_set_x, test_set_y = shared_dataset(test_data, test_labels)
 
-a,b = mnist.read(range(10), 'training', datapath)
-c,d = mnist.read(range(10), 'testing', datapath)
-if dataPCA:
-    print 'Reducing dataset dimension to %s via PCA.'%nCoeffs
-    a = mnist.applyPCA(a, nCoeffs)
-    c = mnist.applyPCA(c, nCoeffs)
-if dataDCT:
-    print 'Reducing dataset dimension to %s via DCT.'%nCoeffs
-    a = mnist.applyDCT(a, nCoeffs)
-    c = mnist.applyDCT(c, nCoeffs)
-train_set_x, train_set_y = shared_dataset(a,b)
-test_set_x, test_set_y = shared_dataset(c,d)
+f = gzip.open(os.path.join(datapath, 'mnist.pkl.gz'), 'rb')
+train_set, valid_set, test_set = cPickle.load(f)
+f.close()
+train_set_x, train_set_y = shared_dataset(train_set[0], train_set[1])
+valid_set_x, valid_set_y = shared_dataset(valid_set[0], valid_set[1])
+test_set_x, test_set_y = shared_dataset(test_set[0], test_set[1])
 
 visibleSize   = train_set_x.shape[1].eval() # Dimension of each training example
 nTrain        = train_set_x.shape[0].eval() # Number training samples
@@ -140,6 +136,8 @@ y = T.ivector('y')                      # Vector of labels
 
 epoch = 0
 train_costs, test_costs, test_acc = [],[],[]
+
+def plotProgress(): pass
 
 def train(nEpochs=trainEpochs):
     #================== Theano Functions ==========================#
@@ -208,9 +206,8 @@ def train(nEpochs=trainEpochs):
             print 'Error: %.2f'%test_err
         else: print ''
         sys.stdout.flush()
-        # if epoch % 10 == 0:
-        #     shownet.plotCost('results/train.png', train_costs, test_costs, test_acc)
-        #     showWeights()
+        if epoch % 10 == 0:
+            plotProgress()
         epoch += 1
 
     #================== Optimize ==========================#
@@ -222,6 +219,7 @@ def train(nEpochs=trainEpochs):
         callback=callbackFn,
         maxiter=nEpochs)
     end = time.time()
+    plotProgress()
     print 'Elapsed Time(s): ', end - start
     return opttheta
 
