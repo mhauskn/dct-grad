@@ -19,6 +19,14 @@ def showPart1():
                             filters = W1_v,
                             _title='Layer 1 Weights')
     
+    # Plotting confusion matrix
+    p_y_given_x = model.forward(test_set_x)
+    ypred = T.argmax(p_y_given_x, axis=1)
+    shownet.plot_confusion_matrix(fname='results/confusion.png',
+                                  y_true=test_set_y.eval(),
+                                  y_pred=ypred.eval(),
+                                  labels=None)
+
 def showPart2():
     W2 = model.layers[2].W.eval() # 10x784
     b2 = model.layers[2].b.eval() # 784
@@ -74,26 +82,26 @@ else:
     opttheta = train(100)
     model.setTheta(opttheta)
 
-    # Add decoding/visualization layer
-    decode = Layer(10, visibleSize, activation=actFn)
-    model.addLayer(decode)
+    # # Add decoding/visualization layer
+    # decode = Layer(10, visibleSize, activation=actFn)
+    # model.addLayer(decode)
 
-    # Freeze previous layers
-    model.freezeLayer(0)
-    model.freezeLayer(1)
-    model.finalize()
+    # # Freeze previous layers
+    # model.freezeLayer(0)
+    # model.freezeLayer(1)
+    # model.finalize()
 
-    plotProgress = showPart2
+    # plotProgress = showPart2
 
-    # Train the decoding layer to reconstruct
-    output = model.forward(x)
-    cost = reconstructionCost(decode, x)
-    opttheta = train(10)
+    # # Train the decoding layer to reconstruct
+    # output = model.forward(x)
+    # cost = reconstructionCost(decode, x)
+    # opttheta = train(10)
 
-    # model.unfreezeLayer(0)
-    # model.unfreezeLayer(1)
-    # model.setTheta(opttheta)
-    model.freezeLayer(2)
-    model.save('results/vis.mdl')
+    # # model.unfreezeLayer(0)
+    # # model.unfreezeLayer(1)
+    # # model.setTheta(opttheta)
+    # model.freezeLayer(2)
+    # model.save('results/vis.mdl')
 
 
